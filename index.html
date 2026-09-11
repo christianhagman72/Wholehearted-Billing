@@ -1533,8 +1533,7 @@ function exportReportCSV(){
     [],
     ['NOTE: For guidance only. Verify with a qualified accountant.'],
   ];
-  const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('
-');
+  const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
   a.download=`income-report-${meta.from}-to-${meta.to}.csv`;
@@ -1806,8 +1805,8 @@ function calcTax() {
   const taxY = now2 >= new Date(now2.getFullYear(), 3, 6) ? now2.getFullYear() : now2.getFullYear() - 1;
   document.getElementById('tx-dates').innerHTML = [
     { date: `31 Jan ${taxY+1}`, label: 'Self-assessment return & balancing payment due', highlight: true },
-    { date: `31 Jan ${taxY+1}`, label: '1st payment on account (50% of this year's bill)', highlight: false },
-    { date: `31 Jul ${taxY+1}`, label: '2nd payment on account (50% of this year's bill)', highlight: false },
+    { date: `31 Jan ${taxY+1}`, label: '1st payment on account (50% of this year\'s bill)', highlight: false },
+    { date: `31 Jul ${taxY+1}`, label: '2nd payment on account (50% of this year\'s bill)', highlight: false },
     { date: `5 Oct ${taxY+1}`,  label: 'Register for self-assessment (if new)', highlight: false },
   ].map(d=>`<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">
     <div style="min-width:90px;font-weight:600;color:${d.highlight?'var(--orange)':'var(--text2)'}">${d.date}</div>
