@@ -783,7 +783,7 @@ function renderLog(){
 // ── Render Summary ────────────────────────────────────────────────────
 function renderSummary(){
   const all=getEntries();
-  const bySvc={}, byStu={}, byDate={};
+  const bySvc={}, byStu={}, byDate={}, byCli={};
   all.forEach(e=>{
     const k=e.serviceName||e.description||'Free text';
     if(!bySvc[k]) bySvc[k]={amount:0,qty:0,type:e.type};
