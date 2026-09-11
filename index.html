@@ -195,6 +195,8 @@ textarea.form-input{resize:none;min-height:70px}
   <div class="page" id="page-summary">
     <div class="section-title">By Service</div>
     <div class="card" id="summary-by-service"></div>
+    <div class="section-title" style="margin-top:18px">By Client</div>
+    <div class="card" id="summary-by-client"></div>
     <div class="section-title" style="margin-top:18px">By Student</div>
     <div class="card" id="summary-by-student"></div>
     <div class="section-title" style="margin-top:18px">By Date</div>
@@ -382,26 +384,49 @@ textarea.form-input{resize:none;min-height:70px}
     <div class="section-title">Tax Estimator</div>
     <div class="info-box"><strong>📅 2025/26 tax year rates.</strong> Sole trader — self-employment income only. For guidance only; always verify with a qualified accountant before making payments to HMRC.</div>
 
+    <!-- Auto-loaded summary banner -->
+    <div class="card" style="padding:14px;margin-bottom:12px" id="tax-auto-banner">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div class="section-title" style="font-size:14px;margin-bottom:0">📅 Current Tax Year</div>
+        <span id="tax-year-label" style="font-size:12px;color:var(--text2)"></span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+        <div style="background:var(--bg3);border-radius:10px;padding:10px 12px">
+          <div style="font-size:11px;color:var(--text2);margin-bottom:3px">Income to date</div>
+          <div style="font-size:18px;font-weight:700;color:var(--green)" id="tax-banner-income">£0</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:10px;padding:10px 12px">
+          <div style="font-size:11px;color:var(--text2);margin-bottom:3px">Expenses to date</div>
+          <div style="font-size:18px;font-weight:700;color:var(--accent)" id="tax-banner-exp">£0</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:10px;padding:10px 12px">
+          <div style="font-size:11px;color:var(--text2);margin-bottom:3px">Days into tax year</div>
+          <div style="font-size:18px;font-weight:700" id="tax-banner-days">0</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:10px;padding:10px 12px">
+          <div style="font-size:11px;color:var(--text2);margin-bottom:3px">Projected full year</div>
+          <div style="font-size:18px;font-weight:700;color:var(--orange)" id="tax-banner-projected">£0</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="chip active" id="tax-mode-btn-taxyr"  onclick="setTaxMode('tax-year')">Tax year to date</button>
+        <button class="chip"        id="tax-mode-btn-proj"   onclick="setTaxMode('projected')">Projected full year</button>
+        <button class="chip"        id="tax-mode-btn-custom" onclick="setTaxMode('custom')">Enter manually</button>
+      </div>
+    </div>
+
     <div class="card" style="padding:14px">
-      <div class="section-title" style="font-size:14px;margin-bottom:10px">💷 Income & Expenses</div>
+      <div class="section-title" style="font-size:14px;margin-bottom:10px">💷 Figures Used in Calculation</div>
       <div class="form-group">
         <label class="form-label">Gross self-employment income (£)</label>
-        <input class="form-input" type="number" id="tax-income" placeholder="0.00" step="0.01" min="0" oninput="calcTax()"/>
-        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-          <button class="chip" onclick="taxPrefill('ytd')">Use YTD income</button>
-          <button class="chip" onclick="taxPrefill('tax-year')">Use this tax year</button>
-          <button class="chip" onclick="taxPrefill('projected')">Project full year</button>
-        </div>
+        <input class="form-input" type="number" id="tax-income" placeholder="0.00" step="0.01" min="0" oninput="calcTax()" readonly/>
       </div>
       <div class="form-group">
         <label class="form-label">Allowable expenses (£)</label>
-        <input class="form-input" type="number" id="tax-exp" placeholder="0.00" step="0.01" min="0" oninput="calcTax()"/>
-        <div style="display:flex;gap:8px;margin-top:8px">
-          <button class="chip" onclick="taxPrefillExp()">Use captured expenses</button>
-        </div>
+        <input class="form-input" type="number" id="tax-exp" placeholder="0.00" step="0.01" min="0" oninput="calcTax()" readonly/>
       </div>
       <div class="form-group">
-        <label class="form-label">Personal allowance override (£) <span style="color:var(--text3);font-size:11px">default £12,570</span></label>
+        <label class="form-label">Personal allowance (£) <span style="color:var(--text3);font-size:11px">default £12,570</span></label>
         <input class="form-input" type="number" id="tax-allowance" placeholder="12570" value="12570" step="1" min="0" oninput="calcTax()"/>
       </div>
     </div>
@@ -521,6 +546,10 @@ textarea.form-input{resize:none;min-height:70px}
       <input class="form-input" type="text" id="entry-free-desc" placeholder="e.g. Travel expenses"/>
     </div>
     <div class="form-group">
+      <label class="form-label">Client (optional)</label>
+      <select class="form-select" id="entry-client"><option value="">— No client —</option></select>
+    </div>
+    <div class="form-group">
       <label class="form-label">Student (optional)</label>
       <select class="form-select" id="entry-student"><option value="">— No student —</option></select>
     </div>
@@ -612,6 +641,7 @@ textarea.form-input{resize:none;min-height:70px}
     <div class="form-group"><label class="form-label">Address</label><textarea class="form-input" id="cli-address" placeholder="Street address&#10;City, Postcode"></textarea></div>
     <div class="form-group"><label class="form-label">Email</label><input class="form-input" type="email" id="cli-email" placeholder="accounts@client.com"/></div>
     <div class="form-group"><label class="form-label">Phone (optional)</label><input class="form-input" type="tel" id="cli-phone" placeholder="+44 ..."/></div>
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 0"><input type="checkbox" id="cli-default" style="width:20px;height:20px;accent-color:var(--accent);cursor:pointer"/><label for="cli-default" style="font-size:14px;cursor:pointer">Set as default client <span style="font-size:12px;color:var(--text2)">(pre-selected on new entries)</span></label></div>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeClientModal()">Cancel</button>
       <button class="btn btn-primary" onclick="saveClient()">Save</button>
@@ -689,6 +719,7 @@ function switchToTab(name){
   if(idx>=0) document.querySelectorAll('.tab')[idx].classList.add('active');
   document.getElementById('fab-btn').style.display=(name==='log')?'flex':'none';
   document.getElementById('fab-exp').style.display=(name==='expenses')?'flex':'none';
+  if(name==='tax') autoLoadTax();
 }
 
 // ── Filter ────────────────────────────────────────────────────────────
@@ -730,11 +761,12 @@ function renderLog(){
       const icon=e.type==='hourly'?'⏱':e.type==='fixed'?'📦':'✏️';
       const qLabel=e.type==='hourly'?`${e.qty}h @ ${fmt(e.rate)}/hr`:e.type==='fixed'?`${e.qty} × ${fmt(e.rate)}`:'';
       const student=e.studentName?`<div class="entry-student">👤 ${e.studentName}</div>`:'';
+      const clientTag=e.clientName?`<div style="font-size:12px;color:var(--blue);margin-top:1px;font-weight:500">🏢 ${e.clientName}</div>`:'';
       return `<div class="entry-item">
         <div class="entry-icon ${e.type}">${icon}</div>
         <div class="entry-body">
           <div class="entry-desc">${e.serviceName||e.description||'Entry'}</div>
-          ${student}
+          ${student}${clientTag}
           <div class="entry-meta">${e.notes||''}${e.notes&&qLabel?' · ':''}${qLabel}</div>
         </div>
         <div class="entry-right"><div class="entry-amount">${fmt(e.amount)}</div></div>
@@ -757,11 +789,15 @@ function renderSummary(){
     if(!bySvc[k]) bySvc[k]={amount:0,qty:0,type:e.type};
     bySvc[k].amount+=e.amount; bySvc[k].qty+=e.qty||0;
     if(e.studentName){ if(!byStu[e.studentName]) byStu[e.studentName]={amount:0,count:0}; byStu[e.studentName].amount+=e.amount; byStu[e.studentName].count++; }
+    if(e.clientName){ if(!byCli[e.clientName]) byCli[e.clientName]={amount:0,count:0}; byCli[e.clientName].amount+=e.amount; byCli[e.clientName].count++; }
     byDate[e.date]=(byDate[e.date]||0)+e.amount;
   });
   const svcEl=document.getElementById('summary-by-service');
   const svcKeys=Object.keys(bySvc);
   svcEl.innerHTML=svcKeys.length?svcKeys.sort((a,b)=>bySvc[b].amount-bySvc[a].amount).map(name=>{ const d=bySvc[name],q=d.type==='hourly'?d.qty.toFixed(1)+' hrs':d.qty>0?d.qty+' units':''; return `<div class="card-row"><div style="flex:1"><div style="font-size:14px;font-weight:500">${name}</div><div style="font-size:11px;color:var(--text2);margin-top:2px">${q}</div></div><div style="font-size:15px;font-weight:600;color:var(--green)">${fmt(d.amount)}</div></div>`; }).join(''):'<div class="empty-state" style="padding:20px"><p>No data yet</p></div>';
+  const cliSumEl=document.getElementById('summary-by-client');
+  const cliSumKeys=Object.keys(byCli);
+  cliSumEl.innerHTML=cliSumKeys.length?cliSumKeys.sort((a,b)=>byCli[b].amount-byCli[a].amount).map(name=>{ const d=byCli[name]; return `<div class="card-row"><div style="flex:1"><div style="font-size:14px;font-weight:500">🏢 ${name}</div><div style="font-size:11px;color:var(--text2);margin-top:2px">${d.count} entr${d.count===1?'y':'ies'}</div></div><div style="font-size:15px;font-weight:600;color:var(--green)">${fmt(d.amount)}</div></div>`; }).join(''):'<div class="empty-state" style="padding:20px"><p>No client data yet</p></div>';
   const stuEl=document.getElementById('summary-by-student');
   const stuKeys=Object.keys(byStu);
   stuEl.innerHTML=stuKeys.length?stuKeys.sort((a,b)=>byStu[b].amount-byStu[a].amount).map(name=>{ const d=byStu[name]; return `<div class="card-row"><div style="flex:1"><div style="font-size:14px;font-weight:500">👤 ${name}</div><div style="font-size:11px;color:var(--text2);margin-top:2px">${d.count} entr${d.count===1?'y':'ies'}</div></div><div style="font-size:15px;font-weight:600;color:var(--green)">${fmt(d.amount)}</div></div>`; }).join(''):'<div class="empty-state" style="padding:20px"><p>No student data yet</p></div>';
@@ -801,7 +837,7 @@ function renderClients(){
   const el=document.getElementById('clients-list'), cls=getClients();
   el.innerHTML=cls.length?cls.map(c=>`<div class="list-item">
     <span style="font-size:20px">🏢</span>
-    <div style="flex:1"><div class="list-item-name">${c.company||c.name}</div><div class="list-item-sub">${[c.name,c.email].filter(Boolean).join(' · ')}</div></div>
+    <div style="flex:1"><div class="list-item-name">${c.company||c.name}${c.isDefault?' <span style="background:var(--accent-dim);color:var(--accent);font-size:10px;padding:2px 6px;border-radius:4px;font-weight:600;margin-left:6px">★ DEFAULT</span>':''}</div><div class="list-item-sub">${[c.name,c.email].filter(Boolean).join(' · ')}</div></div>
     <div class="list-item-actions">
       <button class="edit-btn" onclick="editClient('${c.id}')">✎</button>
       <button class="del-btn"  onclick="deleteClient('${c.id}')">✕</button>
@@ -817,6 +853,10 @@ function populateSelects(){
   const stuSel=document.getElementById('entry-student'), curStu=stuSel.value;
   stuSel.innerHTML='<option value="">— No student —</option>'+getStudents().map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
   stuSel.value=curStu;
+  const cliSel=document.getElementById('entry-client'), curCli=cliSel.value;
+  cliSel.innerHTML='<option value="">— No client —</option>'+getClients().map(c=>`<option value="${c.id}">${c.company||c.name}${c.isDefault?' ★':''}</option>`).join('');
+  if(curCli&&[...cliSel.options].some(o=>o.value===curCli)) cliSel.value=curCli;
+  else if(!curCli){ const def=getClients().find(c=>c.isDefault); if(def) cliSel.value=def.id; }
 }
 
 // ── Invoice client picker ────────────────────────────────────────────
@@ -880,6 +920,8 @@ function openEntryModal(prefill){
   document.getElementById('entry-notes').value='';
   document.getElementById('entry-service').value='';
   document.getElementById('entry-student').value='';
+  const _defCli=getClients().find(c=>c.isDefault);
+  document.getElementById('entry-client').value=_defCli?_defCli.id:'';
   document.getElementById('entry-free-desc').value='';
   document.getElementById('entry-free-amount').value='';
   document.getElementById('entry-amount-preview').textContent='£0.00';
@@ -897,6 +939,7 @@ function editEntry(id){
   document.getElementById('entry-date').value=e.date;
   document.getElementById('entry-notes').value=e.notes||'';
   document.getElementById('entry-student').value=e.studentId||'';
+  document.getElementById('entry-client').value=e.clientId||'';
   if(e.type==='freetext'){
     selectEntryType('freetext');
     document.getElementById('entry-free-desc').value=e.description||'';
@@ -917,6 +960,8 @@ async function saveEntry(){
   const notes=document.getElementById('entry-notes').value.trim();
   const stuId=document.getElementById('entry-student').value;
   const stu=getStudents().find(s=>s.id===stuId);
+  const cliId=document.getElementById('entry-client').value;
+  const cli=getClients().find(c=>c.id===cliId);
   if(!date){ alert('Please select a date.'); return; }
   let entry;
   if(currentEntryType==='freetext'){
@@ -924,14 +969,14 @@ async function saveEntry(){
     const amount=parseFloat(document.getElementById('entry-free-amount').value);
     if(!desc){ alert('Please enter a description.'); return; }
     if(!amount||amount<=0){ alert('Please enter an amount.'); return; }
-    entry={ id:editingEntryId||uid(), type:'freetext', description:desc, amount, date, notes, studentId:stuId||'', studentName:stu?stu.name:'' };
+    entry={ id:editingEntryId||uid(), type:'freetext', description:desc, amount, date, notes, studentId:stuId||'', studentName:stu?stu.name:'', clientId:cliId||'', clientName:cli?(cli.company||cli.name):'' };
   } else {
     const svcId=document.getElementById('entry-service').value;
     const qty=parseFloat(document.getElementById('entry-qty').value);
     const svc=getServices().find(s=>s.id===svcId);
     if(!svc){ alert('Please select a service.'); return; }
     if(!qty||qty<=0){ alert('Please enter a valid quantity.'); return; }
-    entry={ id:editingEntryId||uid(), type:svc.type, serviceId:svc.id, serviceName:svc.name, rate:svc.rate, qty, amount:svc.rate*qty, date, notes, studentId:stuId||'', studentName:stu?stu.name:'' };
+    entry={ id:editingEntryId||uid(), type:svc.type, serviceId:svc.id, serviceName:svc.name, rate:svc.rate, qty, amount:svc.rate*qty, date, notes, studentId:stuId||'', studentName:stu?stu.name:'', clientId:cliId||'', clientName:cli?(cli.company||cli.name):'' };
   }
   await window._db.saveEntry(entry);
   showSync();
@@ -1016,6 +1061,7 @@ function openClientModal(){
   editingCliId=null;
   document.getElementById('client-modal-title').textContent='Add Client';
   ['cli-company','cli-name','cli-address','cli-email','cli-phone'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('cli-default').checked=false;
   document.getElementById('client-modal').classList.add('open');
 }
 function editClient(id){
@@ -1028,6 +1074,7 @@ function editClient(id){
   document.getElementById('cli-address').value=c.address||'';
   document.getElementById('cli-email').value=c.email||'';
   document.getElementById('cli-phone').value=c.phone||'';
+  document.getElementById('cli-default').checked=!!c.isDefault;
   document.getElementById('client-modal').classList.add('open');
 }
 function closeClientModal(){ document.getElementById('client-modal').classList.remove('open'); }
@@ -1035,7 +1082,13 @@ async function saveClient(){
   const company=document.getElementById('cli-company').value.trim();
   const name=document.getElementById('cli-name').value.trim();
   if(!company&&!name){ alert('Please enter at least a company or contact name.'); return; }
-  const c={ id:editingCliId||uid(), company, name, address:document.getElementById('cli-address').value.trim(), email:document.getElementById('cli-email').value.trim(), phone:document.getElementById('cli-phone').value.trim() };
+  const isDefault = document.getElementById('cli-default').checked;
+  if (isDefault) {
+    for (const existing of getClients().filter(x=>x.id!==(editingCliId||'')&&x.isDefault)) {
+      await window._db.saveClient({...existing, isDefault:false});
+    }
+  }
+  const c={ id:editingCliId||uid(), company, name, address:document.getElementById('cli-address').value.trim(), email:document.getElementById('cli-email').value.trim(), phone:document.getElementById('cli-phone').value.trim(), isDefault };
   await window._db.saveClient(c);
   showSync(); if(!window._fbConfigured) renderAll();
   closeClientModal();
@@ -1657,6 +1710,84 @@ const TX = {
 };
 
 let _taxReservePct = 0;
+
+function getTaxYearBounds() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const thisApr = new Date(y, 3, 6); // 6 April this year
+  const taxStart = now >= thisApr ? thisApr : new Date(y-1, 3, 6);
+  const taxEnd   = new Date(taxStart.getFullYear()+1, 3, 5); // 5 April next year
+  return {
+    start: taxStart.toISOString().split('T')[0],
+    end:   taxEnd.toISOString().split('T')[0],
+    label: `6 Apr ${taxStart.getFullYear()} – 5 Apr ${taxEnd.getFullYear()}`,
+    daysTotal: Math.round((taxEnd - taxStart) / 86400000),
+    daysPassed: Math.max(1, Math.round((now - taxStart) / 86400000)),
+  };
+}
+
+let _taxMode = 'tax-year';
+
+function autoLoadTax() {
+  const { start, end, label, daysTotal, daysPassed } = getTaxYearBounds();
+  const today = new Date().toISOString().split('T')[0];
+
+  // Income in current tax year
+  const ytdIncome = getEntries()
+    .filter(e => e.date && e.date >= start && e.date <= today)
+    .reduce((s, e) => s + e.amount, 0);
+
+  // Expenses in current tax year
+  const ytdExp = getExpenses()
+    .filter(e => e.date && e.date >= start && e.date <= today)
+    .reduce((s, e) => s + e.amount, 0);
+
+  // Projected full-year income
+  const projected = (ytdIncome / daysPassed) * daysTotal;
+
+  // Update banner
+  document.getElementById('tax-year-label').textContent = label;
+  document.getElementById('tax-banner-income').textContent = fmt(ytdIncome);
+  document.getElementById('tax-banner-exp').textContent = fmt(ytdExp);
+  document.getElementById('tax-banner-days').textContent = `${daysPassed} / ${daysTotal}`;
+  document.getElementById('tax-banner-projected').textContent = fmt(projected);
+
+  // Store for mode switching
+  window._taxYTDIncome = ytdIncome;
+  window._taxYTDExp = ytdExp;
+  window._taxProjected = projected;
+
+  setTaxMode(_taxMode);
+}
+
+function setTaxMode(mode) {
+  _taxMode = mode;
+  // Update chip states
+  ['taxyr','proj','custom'].forEach(k => {
+    document.getElementById(`tax-mode-btn-${k}`).classList.remove('active');
+  });
+  const modeMap = { 'tax-year':'taxyr', 'projected':'proj', 'custom':'custom' };
+  document.getElementById(`tax-mode-btn-${modeMap[mode]}`).classList.add('active');
+
+  const incomeEl = document.getElementById('tax-income');
+  const expEl    = document.getElementById('tax-exp');
+
+  if (mode === 'tax-year') {
+    incomeEl.value    = (window._taxYTDIncome || 0).toFixed(2);
+    expEl.value       = (window._taxYTDExp    || 0).toFixed(2);
+    incomeEl.readOnly = true;
+    expEl.readOnly    = true;
+  } else if (mode === 'projected') {
+    incomeEl.value    = (window._taxProjected || 0).toFixed(2);
+    expEl.value       = (window._taxYTDExp    || 0).toFixed(2);
+    incomeEl.readOnly = true;
+    expEl.readOnly    = true;
+  } else {
+    incomeEl.readOnly = false;
+    expEl.readOnly    = false;
+  }
+  calcTax();
+}
 
 function taxPrefill(mode) {
   const now = new Date();
