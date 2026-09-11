@@ -29,6 +29,8 @@
   onSnapshot(collection(db,'entries'),  s=>{ window._entries=[]; s.forEach(d=>window._entries.push(d.data())); window.renderAll&&window.renderAll(); });
   onSnapshot(collection(db,'services'), s=>{ window._services=[]; s.forEach(d=>window._services.push(d.data())); window.renderAll&&window.renderAll(); });
   onSnapshot(collection(db,'students'), s=>{ window._students=[]; s.forEach(d=>window._students.push(d.data())); window.renderAll&&window.renderAll(); });
+  onSnapshot(collection(db,'clients'),  s=>{ window._clients=[];  s.forEach(d=>window._clients.push(d.data()));  window.renderAll&&window.renderAll(); });
+  onSnapshot(collection(db,'expenses'), s=>{ window._expenses=[]; s.forEach(d=>window._expenses.push(d.data())); window.renderAll&&window.renderAll(); });
   onSnapshot(doc(db,'settings','provider'), s=>{ if(s.exists()){ window._provider=s.data(); window.applyProvider&&window.applyProvider(); }});
   window._db = {
     async saveEntry(e)     { await setDoc(doc(db,'entries',e.id),e); },
@@ -37,6 +39,10 @@
     async deleteService(id){ await deleteDoc(doc(db,'services',id)); },
     async saveStudent(s)   { await setDoc(doc(db,'students',s.id),s); },
     async deleteStudent(id){ await deleteDoc(doc(db,'students',id)); },
+    async saveClient(c)    { await setDoc(doc(db,'clients',c.id),c); },
+    async deleteClient(id) { await deleteDoc(doc(db,'clients',id)); },
+    async saveExpense(e)    { await setDoc(doc(db,'expenses',e.id),e); },
+    async deleteExpense(id) { await deleteDoc(doc(db,'expenses',id)); },
     async saveProvider(p)  { await setDoc(doc(db,'settings','provider'),p); },
   };
 </script>
@@ -158,7 +164,11 @@ textarea.form-input{resize:none;min-height:70px}
     <button class="tab" onclick="switchToTab('summary')">Summary</button>
     <button class="tab" onclick="switchToTab('services')">Services</button>
     <button class="tab" onclick="switchToTab('students')">Students</button>
+    <button class="tab" onclick="switchToTab('clients')">Clients</button>
     <button class="tab" onclick="switchToTab('invoice')">Invoice</button>
+    <button class="tab" onclick="switchToTab('expenses')">Expenses</button>
+    <button class="tab" onclick="switchToTab('reports')">Reports</button>
+    <button class="tab" onclick="switchToTab('tax')">Tax</button>
     <button class="tab" onclick="switchToTab('settings')">Settings</button>
   </div>
 
@@ -207,6 +217,14 @@ textarea.form-input{resize:none;min-height:70px}
     <button class="action-btn" style="margin-top:10px" onclick="openStudentModal()">+ Add Student</button>
   </div>
 
+  <!-- CLIENTS -->
+  <div class="page" id="page-clients">
+    <div class="section-title">Clients</div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:14px">Save client details to auto-fill invoices.</p>
+    <div class="card" id="clients-list"></div>
+    <button class="action-btn" style="margin-top:10px" onclick="openClientModal()">+ Add Client</button>
+  </div>
+
   <!-- INVOICE -->
   <div class="page" id="page-invoice">
     <div class="section-title">Create Invoice</div>
@@ -220,11 +238,16 @@ textarea.form-input{resize:none;min-height:70px}
       </div>
       <div class="form-group"><label class="form-label">Period covered (optional)</label><input class="form-input" type="text" id="inv-period" placeholder="e.g. October 2026"/></div>
       <div class="form-group"><label class="form-label">Filter entries</label>
-        <select class="form-select" id="inv-filter">
+        <select class="form-select" id="inv-filter" onchange="onInvFilterChange()">
           <option value="all">All entries</option>
-          <option value="month">This month</option>
           <option value="week">This week</option>
+          <option value="month">This month</option>
         </select>
+      </div>
+    </div>
+    <div class="card" style="padding:14px">
+      <div class="form-group"><label class="form-label">Saved clients</label>
+        <select class="form-select" id="inv-client-picker" onchange="onInvClientPick()"><option value="">— Pick a saved client or fill in below —</option></select>
       </div>
     </div>
     <div class="card" style="padding:14px">
@@ -245,6 +268,212 @@ textarea.form-input{resize:none;min-height:70px}
     <button class="action-btn" onclick="previewInvoice()">👁 Preview entries</button>
     <button class="action-btn" onclick="generateDocx()" style="background:var(--blue);color:white;border-color:var(--blue)">📄 Download Word (.docx)</button>
     <button class="action-btn" onclick="generatePDF()" style="background:var(--purple);color:white;border-color:var(--purple)">🖨 Print / Save as PDF</button>
+  </div>
+
+  <!-- EXPENSES -->
+  <div class="page" id="page-expenses">
+    <div class="stats-bar">
+      <div class="stat"><div class="stat-label">This month</div><div class="stat-val accent" id="exp-stat-month">£0</div></div>
+      <div class="stat"><div class="stat-label">This year</div><div class="stat-val" id="exp-stat-year">£0</div></div>
+      <div class="stat"><div class="stat-label">All time</div><div class="stat-val green" id="exp-stat-all">£0</div></div>
+    </div>
+    <div class="filter-row">
+      <button class="chip active" onclick="setExpFilter('all',this)">All time</button>
+      <button class="chip" onclick="setExpFilter('today',this)">Today</button>
+      <button class="chip" onclick="setExpFilter('week',this)">This week</button>
+      <button class="chip" onclick="setExpFilter('month',this)">This month</button>
+    </div>
+    <div class="card">
+      <div class="empty-state" id="empty-exp"><div class="icon">🧾</div><p>No expenses yet.<br/>Tap + to add your first expense.</p></div>
+      <div id="expenses-list"></div>
+    </div>
+    <button class="fab" id="fab-exp" onclick="openExpenseModal()" style="display:none;background:#bf5af2;box-shadow:0 4px 24px rgba(191,90,242,.4)"><span style="font-size:18px">+</span> Add Expense</button>
+  </div>
+
+  <!-- REPORTS -->
+  <div class="page" id="page-reports">
+    <div class="section-title">Income Report</div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:14px">Run a report across any date range for bank reconciliation and self-assessment.</p>
+
+    <div class="card" style="padding:14px">
+      <div class="section-title" style="font-size:14px;margin-bottom:10px">📅 Date Range</div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">From</label><input class="form-input" type="date" id="rpt-from"/></div>
+        <div class="form-group"><label class="form-label">To</label><input class="form-input" type="date" id="rpt-to"/></div>
+      </div>
+      <div class="form-group"><label class="form-label">Quick select</label>
+        <select class="form-select" id="rpt-quick" onchange="onRptQuick()">
+          <option value="">— Choose a period —</option>
+          <option value="this-month">This month</option>
+          <option value="last-month">Last month</option>
+          <option value="this-quarter">This quarter</option>
+          <option value="last-quarter">Last quarter</option>
+          <option value="this-tax-year">This tax year (6 Apr – 5 Apr)</option>
+          <option value="last-tax-year">Last tax year</option>
+          <option value="this-year">This calendar year</option>
+          <option value="last-year">Last calendar year</option>
+          <option value="all">All time</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Filter by client (optional)</label>
+        <select class="form-select" id="rpt-client"><option value="">All clients</option></select>
+      </div>
+      <button class="action-btn" style="margin-bottom:0" onclick="runReport()">▶ Run Report</button>
+    </div>
+
+    <div id="rpt-results" style="display:none">
+      <div class="card" style="padding:14px;margin-top:12px">
+        <div class="section-title" style="font-size:14px;margin-bottom:10px">💷 Income Summary</div>
+        <div id="rpt-summary-rows"></div>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:14px;color:var(--text2)">Gross income</span>
+            <span style="font-size:18px;font-weight:700;color:var(--green)" id="rpt-gross">£0.00</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="padding:14px">
+        <div class="section-title" style="font-size:14px;margin-bottom:4px">📋 Self-Assessment</div>
+        <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Enter allowable expenses to calculate taxable profit. This is a guide only — consult your accountant.</p>
+        <div class="form-group">
+          <label class="form-label">Allowable expenses (£)</label>
+          <input class="form-input" type="number" id="rpt-expenses" placeholder="0.00" step="0.01" min="0" oninput="updateTaxCalc()"/>
+        </div>
+        <div style="background:var(--bg3);border-radius:10px;padding:12px 14px">
+          <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
+            <span style="font-size:13px;color:var(--text2)">Gross income</span>
+            <span style="font-size:13px;font-weight:600" id="tax-gross">£0.00</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
+            <span style="font-size:13px;color:var(--text2)">Less: allowable expenses</span>
+            <span style="font-size:13px;font-weight:600;color:var(--accent)" id="tax-expenses">£0.00</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:8px 0 0">
+            <span style="font-size:14px;font-weight:700">Taxable profit</span>
+            <span style="font-size:16px;font-weight:700;color:var(--orange)" id="tax-profit">£0.00</span>
+          </div>
+        </div>
+        <p style="font-size:11px;color:var(--text3);margin-top:8px">⚠️ For guidance only. Always verify with a qualified accountant.</p>
+      </div>
+
+      <div class="card" style="padding:14px">
+        <div class="section-title" style="font-size:14px;margin-bottom:10px">📊 Breakdown by Service</div>
+        <div id="rpt-by-service"></div>
+      </div>
+
+      <div class="card" style="padding:14px">
+        <div class="section-title" style="font-size:14px;margin-bottom:10px">📆 Breakdown by Month</div>
+        <div id="rpt-by-month"></div>
+      </div>
+
+      <div id="rpt-entries-card" class="card" style="padding:14px">
+        <div class="section-title" style="font-size:14px;margin-bottom:10px">🧾 All Entries in Period</div>
+        <div id="rpt-entries-list"></div>
+      </div>
+
+      <button class="action-btn" onclick="exportReportCSV()" style="background:var(--blue);color:white;border-color:var(--blue)">⬇️ Download CSV</button>
+      <button class="action-btn" onclick="exportReportPDF()" style="background:var(--purple);color:white;border-color:var(--purple)">🖨 Print / Save as PDF</button>
+    </div>
+  </div>
+
+  <!-- TAX -->
+  <div class="page" id="page-tax">
+    <div class="section-title">Tax Estimator</div>
+    <div class="info-box"><strong>📅 2025/26 tax year rates.</strong> Sole trader — self-employment income only. For guidance only; always verify with a qualified accountant before making payments to HMRC.</div>
+
+    <div class="card" style="padding:14px">
+      <div class="section-title" style="font-size:14px;margin-bottom:10px">💷 Income & Expenses</div>
+      <div class="form-group">
+        <label class="form-label">Gross self-employment income (£)</label>
+        <input class="form-input" type="number" id="tax-income" placeholder="0.00" step="0.01" min="0" oninput="calcTax()"/>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+          <button class="chip" onclick="taxPrefill('ytd')">Use YTD income</button>
+          <button class="chip" onclick="taxPrefill('tax-year')">Use this tax year</button>
+          <button class="chip" onclick="taxPrefill('projected')">Project full year</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Allowable expenses (£)</label>
+        <input class="form-input" type="number" id="tax-exp" placeholder="0.00" step="0.01" min="0" oninput="calcTax()"/>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="chip" onclick="taxPrefillExp()">Use captured expenses</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Personal allowance override (£) <span style="color:var(--text3);font-size:11px">default £12,570</span></label>
+        <input class="form-input" type="number" id="tax-allowance" placeholder="12570" value="12570" step="1" min="0" oninput="calcTax()"/>
+      </div>
+    </div>
+
+    <div id="tax-results" style="display:none">
+      <!-- Summary tiles -->
+      <div class="stats-bar" style="grid-template-columns:repeat(2,1fr)">
+        <div class="stat"><div class="stat-label">Taxable profit</div><div class="stat-val" id="tx-profit">£0</div></div>
+        <div class="stat"><div class="stat-label">Total tax & NI due</div><div class="stat-val accent" id="tx-total">£0</div></div>
+        <div class="stat"><div class="stat-label">Effective rate</div><div class="stat-val" id="tx-rate">0%</div></div>
+        <div class="stat"><div class="stat-label">Take-home</div><div class="stat-val green" id="tx-takehome">£0</div></div>
+      </div>
+
+      <!-- Income tax breakdown -->
+      <div class="card" style="padding:14px">
+        <div class="section-title" style="font-size:14px;margin-bottom:10px">📊 Income Tax Breakdown</div>
+        <div id="tx-it-rows"></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0 0;border-top:1px solid var(--border);margin-top:4px">
+          <span style="font-size:13px;font-weight:700">Income tax due</span>
+          <span style="font-size:15px;font-weight:700;color:var(--accent)" id="tx-it-total">£0</span>
+        </div>
+      </div>
+
+      <!-- NI breakdown -->
+      <div class="card" style="padding:14px">
+        <div class="section-title" style="font-size:14px;margin-bottom:10px">🏥 National Insurance</div>
+        <div id="tx-ni-rows"></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0 0;border-top:1px solid var(--border);margin-top:4px">
+          <span style="font-size:13px;font-weight:700">NI due</span>
+          <span style="font-size:15px;font-weight:700;color:var(--accent)" id="tx-ni-total">£0</span>
+        </div>
+      </div>
+
+      <!-- Set aside calculator -->
+      <div class="card" style="padding:14px">
+        <div class="section-title" style="font-size:14px;margin-bottom:4px">🏦 Set Aside Calculator</div>
+        <p style="font-size:12px;color:var(--text2);margin-bottom:12px">How much to reserve from each payment you receive.</p>
+        <div style="background:var(--bg3);border-radius:10px;padding:14px;margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <span style="font-size:13px;color:var(--text2)">Reserve rate</span>
+            <span style="font-size:22px;font-weight:700;color:var(--orange)" id="tx-reserve-pct">0%</span>
+          </div>
+          <div style="font-size:12px;color:var(--text3)">of every payment received</div>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Check a specific invoice amount (£)</label>
+          <input class="form-input" type="number" id="tx-invoice-amt" placeholder="e.g. 500.00" step="0.01" min="0" oninput="calcSetAside()"/>
+        </div>
+        <div id="tx-set-aside-result" style="display:none;margin-top:10px;background:var(--orange-dim);border:1px solid var(--orange);border-radius:10px;padding:12px 14px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+            <span style="font-size:13px;color:var(--text2)">Invoice amount</span>
+            <span style="font-size:13px;font-weight:600" id="tx-sa-invoice">£0</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+            <span style="font-size:13px;color:var(--text2)">Set aside for tax</span>
+            <span style="font-size:13px;font-weight:600;color:var(--accent)" id="tx-sa-tax">£0</span>
+          </div>
+          <div style="display:flex;justify-content:space-between">
+            <span style="font-size:14px;font-weight:700">Keep / spend</span>
+            <span style="font-size:16px;font-weight:700;color:var(--green)" id="tx-sa-keep">£0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Payment on account note -->
+      <div class="card" style="padding:14px">
+        <div class="section-title" style="font-size:14px;margin-bottom:8px">📆 Key HMRC Dates</div>
+        <div id="tx-dates"></div>
+      </div>
+
+      <p style="font-size:11px;color:var(--text3);text-align:center;margin-top:4px;margin-bottom:8px">⚠️ Estimates only. Tax law is complex — always verify with a qualified accountant.</p>
+    </div>
   </div>
 
   <!-- SETTINGS -->
@@ -322,6 +551,74 @@ textarea.form-input{resize:none;min-height:70px}
   </div>
 </div>
 
+<!-- EXPENSE MODAL -->
+<div class="modal-overlay" id="expense-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="expense-modal-title">Add Expense</div>
+    <div class="form-group"><label class="form-label">Category</label>
+      <select class="form-select" id="exp-category" onchange="onExpCatChange()">
+        <option value="Travel & transport">🚗 Travel & transport</option>
+        <option value="Office & equipment">🖥 Office & equipment</option>
+        <option value="Meals & entertainment">🍽 Meals & entertainment</option>
+        <option value="Other">📦 Other</option>
+        <option value="__custom__">✏️ Type my own...</option>
+      </select>
+    </div>
+    <div class="form-group" id="exp-custom-group" style="display:none">
+      <label class="form-label">Custom category</label>
+      <input class="form-input" type="text" id="exp-custom-cat" placeholder="e.g. Professional fees, Training..."/>
+    </div>
+    <div class="form-group"><label class="form-label">Description</label>
+      <input class="form-input" type="text" id="exp-desc" placeholder="e.g. Train to London, Laptop stand"/>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Amount (£)</label>
+        <input class="form-input" type="number" id="exp-amount" placeholder="0.00" step="0.01" min="0"/>
+      </div>
+      <div class="form-group"><label class="form-label">Date</label>
+        <input class="form-input" type="date" id="exp-date"/>
+      </div>
+    </div>
+    <div class="form-group"><label class="form-label">Supplier (optional)</label>
+      <input class="form-input" type="text" id="exp-supplier" placeholder="e.g. Trainline, Amazon"/>
+    </div>
+    <div class="form-group"><label class="form-label">Notes (optional)</label>
+      <input class="form-input" type="text" id="exp-notes" placeholder="e.g. Client meeting travel"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Receipt photo (optional)</label>
+      <input type="file" id="exp-receipt" accept="image/*" capture="environment" style="display:none" onchange="onReceiptPick()"/>
+      <button class="action-btn" style="margin-bottom:6px" onclick="document.getElementById('exp-receipt').click()">📷 Take / choose photo</button>
+      <div id="exp-receipt-preview" style="display:none;margin-top:6px">
+        <img id="exp-receipt-img" style="width:100%;border-radius:10px;max-height:180px;object-fit:cover"/>
+        <button onclick="clearReceipt()" style="margin-top:6px;font-size:12px;color:var(--accent);background:none;border:none;cursor:pointer">✕ Remove photo</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeExpenseModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveExpense()" style="background:var(--purple)">Save Expense</button>
+    </div>
+  </div>
+</div>
+
+<!-- CLIENT MODAL -->
+<div class="modal-overlay" id="client-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="client-modal-title">Add Client</div>
+    <div class="form-group"><label class="form-label">Company / Client name</label><input class="form-input" type="text" id="cli-company" placeholder="e.g. Acme Corp"/></div>
+    <div class="form-group"><label class="form-label">Contact name</label><input class="form-input" type="text" id="cli-name" placeholder="e.g. John Smith"/></div>
+    <div class="form-group"><label class="form-label">Address</label><textarea class="form-input" id="cli-address" placeholder="Street address&#10;City, Postcode"></textarea></div>
+    <div class="form-group"><label class="form-label">Email</label><input class="form-input" type="email" id="cli-email" placeholder="accounts@client.com"/></div>
+    <div class="form-group"><label class="form-label">Phone (optional)</label><input class="form-input" type="tel" id="cli-phone" placeholder="+44 ..."/></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeClientModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveClient()">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- SERVICE MODAL -->
 <div class="modal-overlay" id="service-modal">
   <div class="modal">
@@ -368,6 +665,8 @@ function showSync(){ const el=document.getElementById('sync-status'); el.classLi
 function getEntries(){ return window._entries||[]; }
 function getServices(){ return window._services||[]; }
 function getStudents(){ return window._students||[]; }
+function getClients(){   return window._clients||[];  }
+function getExpenses(){  return window._expenses||[]; }
 function getProvider(){ return window._provider||{}; }
 
 // ── Init ─────────────────────────────────────────────────────────────
@@ -381,7 +680,7 @@ document.getElementById('inv-number').value='INV-'+_now.getFullYear()+_pad(_now.
 window.addEventListener('load',()=>{ setTimeout(()=>{ renderAll(); applyProvider(); },500); });
 
 // ── Tabs ─────────────────────────────────────────────────────────────
-const TAB_NAMES=['log','summary','services','students','invoice','settings'];
+const TAB_NAMES=['log','summary','services','students','clients','invoice','expenses','reports','tax','settings'];
 function switchToTab(name){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
@@ -389,6 +688,7 @@ function switchToTab(name){
   const idx=TAB_NAMES.indexOf(name);
   if(idx>=0) document.querySelectorAll('.tab')[idx].classList.add('active');
   document.getElementById('fab-btn').style.display=(name==='log')?'flex':'none';
+  document.getElementById('fab-exp').style.display=(name==='expenses')?'flex':'none';
 }
 
 // ── Filter ────────────────────────────────────────────────────────────
@@ -407,7 +707,7 @@ function filteredEntries(filter){
 function setFilter(f,el){ currentFilter=f; document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active')); el.classList.add('active'); renderAll(); }
 
 // ── Render all ────────────────────────────────────────────────────────
-window.renderAll=function(){ renderLog(); renderSummary(); renderServices(); renderStudents(); populateSelects(); };
+window.renderAll=function(){ renderLog(); renderSummary(); renderServices(); renderStudents(); renderClients(); renderExpenses(); populateSelects(); populateInvFilter(); populateInvClientPicker(); populateRptClient(); };
 
 // ── Render Log (grouped by date, sorted desc) ─────────────────────────
 function renderLog(){
@@ -496,6 +796,19 @@ function renderStudents(){
   </div>`).join(''):'<div class="empty-state" style="padding:24px"><p>No students yet</p></div>';
 }
 
+// ── Render Clients ───────────────────────────────────────────────────
+function renderClients(){
+  const el=document.getElementById('clients-list'), cls=getClients();
+  el.innerHTML=cls.length?cls.map(c=>`<div class="list-item">
+    <span style="font-size:20px">🏢</span>
+    <div style="flex:1"><div class="list-item-name">${c.company||c.name}</div><div class="list-item-sub">${[c.name,c.email].filter(Boolean).join(' · ')}</div></div>
+    <div class="list-item-actions">
+      <button class="edit-btn" onclick="editClient('${c.id}')">✎</button>
+      <button class="del-btn"  onclick="deleteClient('${c.id}')">✕</button>
+    </div>
+  </div>`).join(''):'<div class="empty-state" style="padding:24px"><p>No clients yet</p></div>';
+}
+
 // ── Populate dropdowns ────────────────────────────────────────────────
 function populateSelects(){
   const svcSel=document.getElementById('entry-service'), curSvc=svcSel.value;
@@ -504,6 +817,24 @@ function populateSelects(){
   const stuSel=document.getElementById('entry-student'), curStu=stuSel.value;
   stuSel.innerHTML='<option value="">— No student —</option>'+getStudents().map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
   stuSel.value=curStu;
+}
+
+// ── Invoice client picker ────────────────────────────────────────────
+function populateInvClientPicker(){
+  const sel=document.getElementById('inv-client-picker'), cur=sel.value;
+  sel.innerHTML='<option value="">— Pick a saved client or fill in below —</option>'+getClients().map(c=>`<option value="${c.id}">${c.company||c.name}${c.name&&c.company?' ('+c.name+')':''}</option>`).join('');
+  if([...sel.options].some(o=>o.value===cur)) sel.value=cur;
+}
+
+function onInvClientPick(){
+  const id=document.getElementById('inv-client-picker').value;
+  if(!id) return;
+  const c=getClients().find(x=>x.id===id);
+  if(!c) return;
+  document.getElementById('inv-client-company').value=c.company||'';
+  document.getElementById('inv-client-name').value=c.name||'';
+  document.getElementById('inv-client-address').value=c.address||'';
+  document.getElementById('inv-client-email').value=c.email||'';
 }
 
 // ── Entry type switching ──────────────────────────────────────────────
@@ -679,6 +1010,38 @@ async function saveStudent(){
 }
 async function deleteStudent(id){ if(!confirm('Delete this student?')) return; await window._db.deleteStudent(id); showSync(); if(!window._fbConfigured) renderAll(); }
 
+// ── Client CRUD ──────────────────────────────────────────────────────
+let editingCliId=null;
+function openClientModal(){
+  editingCliId=null;
+  document.getElementById('client-modal-title').textContent='Add Client';
+  ['cli-company','cli-name','cli-address','cli-email','cli-phone'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('client-modal').classList.add('open');
+}
+function editClient(id){
+  const c=getClients().find(x=>x.id===id);
+  if(!c) return;
+  editingCliId=id;
+  document.getElementById('client-modal-title').textContent='Edit Client';
+  document.getElementById('cli-company').value=c.company||'';
+  document.getElementById('cli-name').value=c.name||'';
+  document.getElementById('cli-address').value=c.address||'';
+  document.getElementById('cli-email').value=c.email||'';
+  document.getElementById('cli-phone').value=c.phone||'';
+  document.getElementById('client-modal').classList.add('open');
+}
+function closeClientModal(){ document.getElementById('client-modal').classList.remove('open'); }
+async function saveClient(){
+  const company=document.getElementById('cli-company').value.trim();
+  const name=document.getElementById('cli-name').value.trim();
+  if(!company&&!name){ alert('Please enter at least a company or contact name.'); return; }
+  const c={ id:editingCliId||uid(), company, name, address:document.getElementById('cli-address').value.trim(), email:document.getElementById('cli-email').value.trim(), phone:document.getElementById('cli-phone').value.trim() };
+  await window._db.saveClient(c);
+  showSync(); if(!window._fbConfigured) renderAll();
+  closeClientModal();
+}
+async function deleteClient(id){ if(!confirm('Delete this client?')) return; await window._db.deleteClient(id); showSync(); if(!window._fbConfigured) renderAll(); }
+
 // ── Provider settings ─────────────────────────────────────────────────
 window.applyProvider=function(){
   const p=getProvider();
@@ -699,7 +1062,48 @@ async function saveProvider(){
 }
 
 // ── Invoice helpers ───────────────────────────────────────────────────
-function getInvoiceEntries(){ return filteredEntries(document.getElementById('inv-filter').value).slice().sort((a,b)=>a.date.localeCompare(b.date)); }
+function populateInvFilter(){
+  const sel=document.getElementById('inv-filter');
+  const cur=sel.value;
+  // Collect all unique year-months from entries
+  const months={};
+  getEntries().forEach(e=>{
+    if(!e.date) return;
+    const ym=e.date.slice(0,7); // "2026-09"
+    if(!months[ym]){
+      const d=new Date(e.date+'T12:00:00');
+      months[ym]=d.toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+    }
+  });
+  // Rebuild options keeping static ones, then sorted months newest first
+  const sortedYMs=Object.keys(months).sort((a,b)=>b.localeCompare(a));
+  sel.innerHTML='<option value="all">All entries</option><option value="week">This week</option><option value="month">This month</option>'
+    +sortedYMs.map(ym=>`<option value="ym:${ym}">${months[ym]}</option>`).join('');
+  // Restore previous selection if still valid
+  if([...sel.options].some(o=>o.value===cur)) sel.value=cur;
+}
+
+function onInvFilterChange(){
+  // Auto-fill period field when a specific month is chosen
+  const val=document.getElementById('inv-filter').value;
+  if(val.startsWith('ym:')){
+    const ym=val.slice(3);
+    const d=new Date(ym+'-01T12:00:00');
+    document.getElementById('inv-period').value=d.toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+  }
+}
+
+function getInvoiceEntries(){
+  const val=document.getElementById('inv-filter').value;
+  let entries;
+  if(val.startsWith('ym:')){
+    const ym=val.slice(3); // e.g. "2026-09"
+    entries=getEntries().filter(e=>e.date&&e.date.startsWith(ym));
+  } else {
+    entries=filteredEntries(val);
+  }
+  return entries.slice().sort((a,b)=>a.date.localeCompare(b.date));
+}
 function getInvoiceMeta(){
   const p=getProvider();
   return {
@@ -796,6 +1200,634 @@ function generatePDF(){
   <div class="footer">Wholehearted Education Limited</div>
   <script>window.print();<\/script></body></html>`);
   w.document.close();
+}
+
+// ── Expenses ──────────────────────────────────────────────────────────
+const EXP_ICONS={'Travel & transport':'🚗','Office & equipment':'🖥','Meals & entertainment':'🍽','Other':'📦'};
+let currentExpFilter='all', editingExpId=null, _receiptBase64='';
+
+function filteredExpenses(filter){
+  filter=filter||currentExpFilter;
+  const now=new Date();
+  return getExpenses().filter(e=>{
+    if(filter==='all') return true;
+    const d=new Date(e.date+'T12:00:00');
+    if(filter==='today') return d.toDateString()===now.toDateString();
+    if(filter==='week'){ const s=new Date(now); s.setDate(now.getDate()-now.getDay()); s.setHours(0,0,0,0); return d>=s; }
+    if(filter==='month') return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();
+  });
+}
+
+function setExpFilter(f,el){
+  currentExpFilter=f;
+  document.querySelectorAll('#page-expenses .chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  renderExpenses();
+}
+
+function renderExpenses(){
+  // Stats
+  const now=new Date(), allExp=getExpenses();
+  const monthExp=allExp.filter(e=>{ const d=new Date(e.date+'T12:00:00'); return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear(); });
+  const yearExp=allExp.filter(e=>new Date(e.date+'T12:00:00').getFullYear()===now.getFullYear());
+  document.getElementById('exp-stat-month').textContent=fmt(monthExp.reduce((s,e)=>s+e.amount,0));
+  document.getElementById('exp-stat-year').textContent=fmt(yearExp.reduce((s,e)=>s+e.amount,0));
+  document.getElementById('exp-stat-all').textContent=fmt(allExp.reduce((s,e)=>s+e.amount,0));
+
+  const fe=filteredExpenses().slice().sort((a,b)=>b.date.localeCompare(a.date));
+  const list=document.getElementById('expenses-list'), empty=document.getElementById('empty-exp');
+  if(!fe.length){ empty.style.display=''; list.innerHTML=''; return; }
+  empty.style.display='none';
+
+  // Group by date
+  const groups={};
+  fe.forEach(e=>{ (groups[e.date]=groups[e.date]||[]).push(e); });
+  const sortedDates=Object.keys(groups).sort((a,b)=>b.localeCompare(a));
+  list.innerHTML=sortedDates.map(date=>{
+    const dayTotal=groups[date].reduce((s,e)=>s+e.amount,0);
+    const rows=groups[date].map(e=>`<div class="entry-item">
+      <div class="entry-icon" style="background:var(--purple-dim);font-size:18px">${EXP_ICONS[e.category]||'📦'}</div>
+      <div class="entry-body">
+        <div class="entry-desc">${e.description}</div>
+        <div class="entry-meta">${e.category}${e.supplier?' · '+e.supplier:''}${e.notes?' · '+e.notes:''}</div>
+        ${e.receiptBase64?`<div style="margin-top:6px"><img src="${e.receiptBase64}" onclick="viewReceipt('${e.id}')" style="height:48px;border-radius:6px;object-fit:cover;cursor:pointer" title="Tap to view receipt"/></div>`:''}
+      </div>
+      <div class="entry-right"><div class="entry-amount">${fmt(e.amount)}</div></div>
+      <div class="entry-actions">
+        <button class="entry-edit" onclick="editExpense('${e.id}')">✎</button>
+        <button class="entry-del" onclick="deleteExpense('${e.id}')">✕</button>
+      </div>
+    </div>`).join('');
+    return `<div class="date-group-header">${fmtDate(date)} <span style="float:right;color:var(--accent)">${fmt(dayTotal)}</span></div>${rows}`;
+  }).join('');
+}
+
+function openExpenseModal(prefill){
+  editingExpId=null; _receiptBase64='';
+  document.getElementById('expense-modal-title').textContent='Add Expense';
+  document.getElementById('exp-desc').value='';
+  document.getElementById('exp-amount').value='';
+  document.getElementById('exp-supplier').value='';
+  document.getElementById('exp-notes').value='';
+  document.getElementById('exp-date').value=today();
+  document.getElementById('exp-category').value='Travel & transport';
+  document.getElementById('exp-custom-cat').value='';
+  document.getElementById('exp-custom-group').style.display='none';
+  document.getElementById('exp-receipt').value='';
+  document.getElementById('exp-receipt-preview').style.display='none';
+  document.getElementById('expense-modal').classList.add('open');
+}
+
+function editExpense(id){
+  const e=getExpenses().find(x=>x.id===id);
+  if(!e) return;
+  editingExpId=id; _receiptBase64=e.receiptBase64||'';
+  document.getElementById('expense-modal-title').textContent='Edit Expense';
+  document.getElementById('exp-desc').value=e.description||'';
+  document.getElementById('exp-amount').value=e.amount||'';
+  document.getElementById('exp-supplier').value=e.supplier||'';
+  document.getElementById('exp-notes').value=e.notes||'';
+  document.getElementById('exp-date').value=e.date||today();
+  const stdCats=['Travel & transport','Office & equipment','Meals & entertainment','Other'];
+  if(stdCats.includes(e.category||'Other')){
+    document.getElementById('exp-category').value=e.category||'Other';
+    document.getElementById('exp-custom-group').style.display='none';
+  } else {
+    document.getElementById('exp-category').value='__custom__';
+    document.getElementById('exp-custom-cat').value=e.category||'';
+    document.getElementById('exp-custom-group').style.display='block';
+  }
+  if(_receiptBase64){
+    document.getElementById('exp-receipt-img').src=_receiptBase64;
+    document.getElementById('exp-receipt-preview').style.display='block';
+  } else {
+    document.getElementById('exp-receipt-preview').style.display='none';
+  }
+  document.getElementById('expense-modal').classList.add('open');
+}
+
+function closeExpenseModal(){ document.getElementById('expense-modal').classList.remove('open'); }
+
+function onExpCatChange(){
+  const val=document.getElementById('exp-category').value;
+  document.getElementById('exp-custom-group').style.display=(val==='__custom__')?'block':'none';
+}
+
+function getExpCategory(){
+  const val=document.getElementById('exp-category').value;
+  if(val==='__custom__') return document.getElementById('exp-custom-cat').value.trim()||'Other';
+  return val;
+}
+
+function onReceiptPick(){
+  const file=document.getElementById('exp-receipt').files[0];
+  if(!file) return;
+  // Compress image before storing
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const img=new Image();
+    img.onload=()=>{
+      const canvas=document.createElement('canvas');
+      const MAX=800;
+      let w=img.width, h=img.height;
+      if(w>h){ if(w>MAX){h=Math.round(h*MAX/w);w=MAX;} } else { if(h>MAX){w=Math.round(w*MAX/h);h=MAX;} }
+      canvas.width=w; canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      _receiptBase64=canvas.toDataURL('image/jpeg',0.7);
+      document.getElementById('exp-receipt-img').src=_receiptBase64;
+      document.getElementById('exp-receipt-preview').style.display='block';
+    };
+    img.src=ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearReceipt(){
+  _receiptBase64='';
+  document.getElementById('exp-receipt').value='';
+  document.getElementById('exp-receipt-preview').style.display='none';
+}
+
+function viewReceipt(id){
+  const e=getExpenses().find(x=>x.id===id);
+  if(!e||!e.receiptBase64) return;
+  const w=window.open('','_blank');
+  w.document.write(`<html><body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh"><img src="${e.receiptBase64}" style="max-width:100%;max-height:100vh;object-fit:contain"/></body></html>`);
+  w.document.close();
+}
+
+async function saveExpense(){
+  const desc=document.getElementById('exp-desc').value.trim();
+  const amount=parseFloat(document.getElementById('exp-amount').value);
+  const date=document.getElementById('exp-date').value;
+  if(!desc){ alert('Please enter a description.'); return; }
+  if(!amount||amount<=0){ alert('Please enter a valid amount.'); return; }
+  if(!date){ alert('Please select a date.'); return; }
+  const exp={
+    id: editingExpId||uid(),
+    description: desc,
+    amount,
+    date,
+    category: getExpCategory(),
+    supplier: document.getElementById('exp-supplier').value.trim(),
+    notes: document.getElementById('exp-notes').value.trim(),
+    receiptBase64: _receiptBase64,
+  };
+  await window._db.saveExpense(exp);
+  showSync(); if(!window._fbConfigured) renderAll();
+  closeExpenseModal();
+}
+
+async function deleteExpense(id){ if(!confirm('Delete this expense?')) return; await window._db.deleteExpense(id); showSync(); if(!window._fbConfigured) renderAll(); }
+
+// ── Reports ───────────────────────────────────────────────────────────
+let _rptEntries=[], _rptGross=0;
+
+function populateRptClient(){
+  const sel=document.getElementById('rpt-client'), cur=sel.value;
+  sel.innerHTML='<option value="">All clients</option>'+getClients().map(c=>`<option value="${c.id}">${c.company||c.name}</option>`).join('');
+  if([...sel.options].some(o=>o.value===cur)) sel.value=cur;
+}
+
+function onRptQuick(){
+  const val=document.getElementById('rpt-quick').value;
+  if(!val) return;
+  const now=new Date();
+  const y=now.getFullYear(), m=now.getMonth();
+  let from,to;
+  const iso=d=>d.toISOString().split('T')[0];
+  const taxYearStart=y=>{
+    // UK tax year starts 6 April
+    return new Date(y,3,6); // months are 0-indexed
+  };
+  if(val==='this-month'){
+    from=iso(new Date(y,m,1)); to=iso(new Date(y,m+1,0));
+  } else if(val==='last-month'){
+    from=iso(new Date(y,m-1,1)); to=iso(new Date(y,m,0));
+  } else if(val==='this-quarter'){
+    const q=Math.floor(m/3); from=iso(new Date(y,q*3,1)); to=iso(new Date(y,q*3+3,0));
+  } else if(val==='last-quarter'){
+    const q=Math.floor(m/3)-1; const qy=q<0?y-1:y; const qi=((q+4)%4);
+    from=iso(new Date(qy,qi*3,1)); to=iso(new Date(qy,qi*3+3,0));
+  } else if(val==='this-tax-year'){
+    const tyStart=now>=taxYearStart(y)?taxYearStart(y):taxYearStart(y-1);
+    from=iso(tyStart); to=iso(new Date(tyStart.getFullYear()+1,3,5));
+  } else if(val==='last-tax-year'){
+    const tyStart=now>=taxYearStart(y)?taxYearStart(y-1):taxYearStart(y-2);
+    from=iso(tyStart); to=iso(new Date(tyStart.getFullYear()+1,3,5));
+  } else if(val==='this-year'){
+    from=iso(new Date(y,0,1)); to=iso(new Date(y,11,31));
+  } else if(val==='last-year'){
+    from=iso(new Date(y-1,0,1)); to=iso(new Date(y-1,11,31));
+  } else if(val==='all'){
+    const dates=getEntries().map(e=>e.date).filter(Boolean).sort();
+    from=dates[0]||iso(now); to=dates[dates.length-1]||iso(now);
+  }
+  document.getElementById('rpt-from').value=from;
+  document.getElementById('rpt-to').value=to;
+}
+
+function runReport(){
+  const from=document.getElementById('rpt-from').value;
+  const to=document.getElementById('rpt-to').value;
+  const cliId=document.getElementById('rpt-client').value;
+  if(!from||!to){ alert('Please select a date range.'); return; }
+  if(from>to){ alert('From date must be before To date.'); return; }
+
+  // Filter entries
+  let entries=getEntries().filter(e=>e.date&&e.date>=from&&e.date<=to);
+  if(cliId){
+    // Match entries by client — entries don't have clientId directly,
+    // so we match via invoice client name stored in entry if present,
+    // or just show all and note client filter is for invoice use
+    // For now filter by clientId on entry if set, else show all
+    entries=entries.filter(e=>!e.clientId||e.clientId===cliId);
+  }
+  entries.sort((a,b)=>a.date.localeCompare(b.date));
+  _rptEntries=entries;
+  _rptGross=entries.reduce((s,e)=>s+e.amount,0);
+
+  // Summary rows
+  const svcMap={}, monthMap={};
+  entries.forEach(e=>{
+    const k=e.serviceName||e.description||'Other';
+    if(!svcMap[k]) svcMap[k]={amount:0,count:0};
+    svcMap[k].amount+=e.amount; svcMap[k].count++;
+    const ym=e.date.slice(0,7);
+    monthMap[ym]=(monthMap[ym]||0)+e.amount;
+  });
+
+  // Render summary
+  document.getElementById('rpt-gross').textContent=fmt(_rptGross);
+  document.getElementById('tax-gross').textContent=fmt(_rptGross);
+  // Auto-fill expenses from captured expense records in the period
+  const periodExpenses=getExpenses().filter(e=>e.date&&e.date>=from&&e.date<=to);
+  const totalExpenses=periodExpenses.reduce((s,e)=>s+e.amount,0);
+  document.getElementById('rpt-expenses').value=totalExpenses>0?totalExpenses.toFixed(2):'';
+  document.getElementById('tax-expenses').textContent=fmt(0);
+  document.getElementById('tax-profit').textContent=fmt(_rptGross);
+
+  // Summary rows — entry count, total hours
+  const totalHrs=entries.filter(e=>e.type==='hourly').reduce((s,e)=>s+e.qty,0);
+  const totalFixed=entries.filter(e=>e.type==='fixed').reduce((s,e)=>s+e.amount,0);
+  const totalFree=entries.filter(e=>e.type==='freetext').reduce((s,e)=>s+e.amount,0);
+  document.getElementById('rpt-summary-rows').innerHTML=[
+    {label:'Period',val:`${fmtDate(from)} – ${fmtDate(to)}`},
+    {label:'Total entries',val:entries.length},
+    {label:'Billable hours',val:totalHrs.toFixed(1)+'h'},
+    {label:'Hourly income',val:fmt(entries.filter(e=>e.type==='hourly').reduce((s,e)=>s+e.amount,0))},
+    {label:'Fixed fee income',val:fmt(totalFixed)},
+    {label:'Other income',val:fmt(totalFree)},
+  ].map(r=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px"><span style="color:var(--text2)">${r.label}</span><span style="font-weight:500">${r.val}</span></div>`).join('');
+
+  // By service
+  const svcKeys=Object.keys(svcMap).sort((a,b)=>svcMap[b].amount-svcMap[a].amount);
+  document.getElementById('rpt-by-service').innerHTML=svcKeys.map(k=>`<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px"><div><div style="font-weight:500">${k}</div><div style="color:var(--text2);font-size:11px">${svcMap[k].count} entr${svcMap[k].count===1?'y':'ies'}</div></div><div style="font-weight:600;color:var(--green)">${fmt(svcMap[k].amount)}</div></div>`).join('');
+
+  // By month
+  const mKeys=Object.keys(monthMap).sort();
+  document.getElementById('rpt-by-month').innerHTML=mKeys.map(ym=>{ const d=new Date(ym+'-01T12:00:00'); const label=d.toLocaleDateString('en-GB',{month:'long',year:'numeric'}); return `<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px"><span style="font-weight:500">${label}</span><span style="font-weight:600;color:var(--green)">${fmt(monthMap[ym])}</span></div>`; }).join('');
+
+  // All entries list
+  document.getElementById('rpt-entries-list').innerHTML=entries.length?entries.map(e=>{ const d=entryDetail(e); return `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;gap:8px"><div style="flex:1;min-width:0"><div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.serviceName||e.description||'Entry'}</div><div style="color:var(--text2);font-size:11px;margin-top:2px">${fmtDate(e.date)}${e.studentName?' · 👤 '+e.studentName:''}${e.notes?' · '+e.notes:''}${d?' · '+d:''}</div></div><div style="font-weight:600;flex-shrink:0">${fmt(e.amount)}</div></div>`; }).join(''):'<div style="padding:16px;text-align:center;color:var(--text2);font-size:13px">No entries in this period</div>';
+
+  document.getElementById('rpt-results').style.display='block';
+  document.getElementById('rpt-results').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function updateTaxCalc(){
+  const expenses=parseFloat(document.getElementById('rpt-expenses').value)||0;
+  document.getElementById('tax-expenses').textContent=fmt(expenses);
+  document.getElementById('tax-profit').textContent=fmt(Math.max(0,_rptGross-expenses));
+}
+
+function getRptMeta(){
+  const from=document.getElementById('rpt-from').value;
+  const to=document.getElementById('rpt-to').value;
+  const expenses=parseFloat(document.getElementById('rpt-expenses').value)||0;
+  const cliId=document.getElementById('rpt-client').value;
+  const cli=getClients().find(c=>c.id===cliId);
+  const p=getProvider();
+  return { from, to, expenses, profit:Math.max(0,_rptGross-expenses),
+    providerName:document.getElementById('set-name').value.trim()||p.name||'Emma Jenkins',
+    providerCompany:document.getElementById('set-company').value.trim()||p.company||'Wholehearted Education Limited',
+    clientLabel:cli?(cli.company||cli.name):'All clients',
+    generated:new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}) };
+}
+
+function exportReportCSV(){
+  if(!_rptEntries.length){ alert('Run a report first.'); return; }
+  const meta=getRptMeta();
+  const rows=[
+    ['Wholehearted Education Income Report'],
+    [`Period: ${fmtDate(meta.from)} to ${fmtDate(meta.to)}`],
+    [`Generated: ${meta.generated}`],
+    [`Client filter: ${meta.clientLabel}`],
+    [],
+    ['Date','Description','Student','Type','Qty','Rate','Amount'],
+    ..._rptEntries.map(e=>[e.date,e.serviceName||e.description||'Entry',e.studentName||'',e.type,e.qty||'',e.rate||'',e.amount.toFixed(2)]),
+    [],
+    ['GROSS INCOME','','','','','',_rptGross.toFixed(2)],
+    ['Less: Allowable expenses','','','','','',meta.expenses.toFixed(2)],
+    ['TAXABLE PROFIT','','','','','',meta.profit.toFixed(2)],
+    [],
+    ['NOTE: For guidance only. Verify with a qualified accountant.'],
+  ];
+  const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('
+');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download=`income-report-${meta.from}-to-${meta.to}.csv`;
+  a.click();
+}
+
+function exportReportPDF(){
+  if(!_rptEntries.length){ alert('Run a report first.'); return; }
+  const meta=getRptMeta();
+  const expenses=parseFloat(document.getElementById('rpt-expenses').value)||0;
+
+  // Month breakdown
+  const monthMap={};
+  _rptEntries.forEach(e=>{ const ym=e.date.slice(0,7); monthMap[ym]=(monthMap[ym]||0)+e.amount; });
+  const monthRows=Object.keys(monthMap).sort().map(ym=>{ const d=new Date(ym+'-01T12:00:00'); return `<tr><td>${d.toLocaleDateString('en-GB',{month:'long',year:'numeric'})}</td><td style="text-align:right">${fmt(monthMap[ym])}</td></tr>`; }).join('');
+
+  // Service breakdown
+  const svcMap={};
+  _rptEntries.forEach(e=>{ const k=e.serviceName||e.description||'Other'; if(!svcMap[k]) svcMap[k]=0; svcMap[k]+=e.amount; });
+  const svcRows=Object.keys(svcMap).sort((a,b)=>svcMap[b]-svcMap[a]).map(k=>`<tr><td>${k}</td><td style="text-align:right">${fmt(svcMap[k])}</td></tr>`).join('');
+
+  // All entries
+  const entryRows=_rptEntries.map((e,i)=>{ const d=entryDetail(e); return `<tr style="background:${i%2===0?'#fff':'#f8fffe'}"><td>${fmtDate(e.date)}</td><td>${e.serviceName||e.description||'Entry'}${e.notes?'<br><small style="color:#777">'+e.notes+'</small>':''}</td><td>${e.studentName||''}</td><td>${d}</td><td style="text-align:right;font-weight:600">${fmt(e.amount)}</td></tr>`; }).join('');
+
+  const w=window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Income Report</title><style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;color:#1a1a1a;padding:32px;max-width:820px;margin:0 auto;font-size:13px}
+  .header{border-bottom:3px solid #1a6b6b;padding-bottom:16px;margin-bottom:24px}
+  .header h1{font-size:24px;font-weight:800;color:#1a6b6b}
+  .header p{font-size:13px;color:#555;margin-top:4px}
+  .section{margin-bottom:28px}
+  .section h2{font-size:14px;font-weight:700;color:#1a6b6b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid #e0e0e0}
+  .summary-box{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
+  .summary-cell{background:#f0f9f0;border-radius:8px;padding:12px 14px}
+  .summary-cell.highlight{background:#e8f4f4}
+  .summary-cell .label{font-size:11px;color:#555;margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px}
+  .summary-cell .val{font-size:20px;font-weight:700;color:#1a6b6b}
+  .tax-box{background:#fff8e6;border:1px solid #ffd060;border-radius:8px;padding:14px 16px;margin-bottom:16px}
+  .tax-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(0,0,0,.06);font-size:13px}
+  .tax-row:last-child{border:none;font-weight:700;font-size:15px;padding-top:10px}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  thead tr{background:#1a6b6b;color:white}
+  th{padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+  th:last-child{text-align:right}
+  td{padding:8px 10px;border-bottom:1px solid #eee;vertical-align:top}
+  td:last-child{text-align:right}
+  .disclaimer{background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:10px 12px;font-size:11px;color:#664d03;margin-top:16px}
+  .footer{margin-top:32px;text-align:center;font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:12px}
+  @media print{body{padding:16px}@page{margin:12mm}}
+  </style></head><body>
+  <div class="header">
+    <h1>Income Report</h1>
+    <p>${meta.providerCompany} · ${meta.providerName}</p>
+    <p>Period: <strong>${fmtDate(meta.from)} – ${fmtDate(meta.to)}</strong> &nbsp;|&nbsp; Client: ${meta.clientLabel} &nbsp;|&nbsp; Generated: ${meta.generated}</p>
+  </div>
+
+  <div class="section">
+    <h2>Income Summary</h2>
+    <div class="summary-box">
+      <div class="summary-cell highlight"><div class="label">Gross Income</div><div class="val">${fmt(_rptGross)}</div></div>
+      <div class="summary-cell"><div class="label">Total Entries</div><div class="val">${_rptEntries.length}</div></div>
+      <div class="summary-cell"><div class="label">Billable Hours</div><div class="val">${_rptEntries.filter(e=>e.type==='hourly').reduce((s,e)=>s+e.qty,0).toFixed(1)}h</div></div>
+      <div class="summary-cell"><div class="label">Fixed / Other</div><div class="val">${fmt(_rptEntries.filter(e=>e.type!=='hourly').reduce((s,e)=>s+e.amount,0))}</div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Self-Assessment Summary</h2>
+    <div class="tax-box">
+      <div class="tax-row"><span>Gross income</span><span>${fmt(_rptGross)}</span></div>
+      <div class="tax-row"><span>Less: allowable expenses</span><span>(${fmt(expenses)})</span></div>
+      <div class="tax-row"><span>Taxable profit</span><span style="color:#d97706">${fmt(meta.profit)}</span></div>
+    </div>
+    <div class="disclaimer">⚠️ For guidance only. Figures should be verified with a qualified accountant before submission to HMRC.</div>
+  </div>
+
+  <div class="section">
+    <h2>Income by Month</h2>
+    <table><thead><tr><th>Month</th><th>Amount</th></tr></thead><tbody>${monthRows}</tbody>
+    <tfoot><tr><td style="font-weight:700">Total</td><td style="text-align:right;font-weight:700">${fmt(_rptGross)}</td></tr></tfoot></table>
+  </div>
+
+  <div class="section">
+    <h2>Income by Service</h2>
+    <table><thead><tr><th>Service</th><th>Amount</th></tr></thead><tbody>${svcRows}</tbody></table>
+  </div>
+
+  <div class="section">
+    <h2>All Entries — Bank Reconciliation</h2>
+    <table><thead><tr><th>Date</th><th>Description</th><th>Student</th><th>Detail</th><th>Amount</th></tr></thead>
+    <tbody>${entryRows}</tbody>
+    <tfoot><tr><td colspan="4" style="font-weight:700;text-align:right">Total</td><td style="font-weight:700;text-align:right">${fmt(_rptGross)}</td></tr></tfoot></table>
+  </div>
+
+  <div class="footer">${meta.providerCompany} &nbsp;·&nbsp; Income Report &nbsp;·&nbsp; ${meta.generated}</div>
+  <script>window.print();<\/script>
+  </body></html>`);
+  w.document.close();
+}
+
+// ── Tax Estimator ─────────────────────────────────────────────────────
+// 2025/26 rates
+const TX = {
+  personalAllowance: 12570,
+  basicRateLimit: 50270,   // PA + basic band (37700)
+  higherRateLimit: 125140, // additional rate threshold
+  basicRate: 0.20,
+  higherRate: 0.40,
+  additionalRate: 0.45,
+  // PA tapers £1 for every £2 over £100k
+  paTaperStart: 100000,
+  // Class 2 NI (flat rate per week if profits > Small Profits Threshold)
+  class2WeeklyRate: 3.45,
+  class2SPT: 12570,        // Small Profits Threshold 2025/26
+  // Class 4 NI
+  class4LowerLimit: 12570,
+  class4UpperLimit: 50270,
+  class4LowerRate: 0.06,   // 6% on profits between lower & upper
+  class4UpperRate: 0.02,   // 2% above upper limit
+};
+
+let _taxReservePct = 0;
+
+function taxPrefill(mode) {
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth();
+  // UK tax year: 6 Apr to 5 Apr
+  const taxStart = now >= new Date(y, 3, 6) ? new Date(y, 3, 6) : new Date(y-1, 3, 6);
+  const taxStartISO = taxStart.toISOString().split('T')[0];
+  const todayISO = now.toISOString().split('T')[0];
+
+  let entries;
+  if (mode === 'tax-year') {
+    entries = getEntries().filter(e => e.date && e.date >= taxStartISO && e.date <= todayISO);
+  } else if (mode === 'ytd') {
+    const janISO = `${y}-01-01`;
+    entries = getEntries().filter(e => e.date && e.date >= janISO && e.date <= todayISO);
+  } else if (mode === 'projected') {
+    // Tax year to date, projected to full year
+    entries = getEntries().filter(e => e.date && e.date >= taxStartISO && e.date <= todayISO);
+    const ytdIncome = entries.reduce((s, e) => s + e.amount, 0);
+    const daysInYear = 365;
+    const daysPassed = Math.max(1, Math.floor((now - taxStart) / 86400000));
+    const projected = (ytdIncome / daysPassed) * daysInYear;
+    document.getElementById('tax-income').value = projected.toFixed(2);
+    calcTax();
+    return;
+  }
+  const income = entries.reduce((s, e) => s + e.amount, 0);
+  document.getElementById('tax-income').value = income.toFixed(2);
+  calcTax();
+}
+
+function taxPrefillExp() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const taxStart = now >= new Date(y, 3, 6) ? new Date(y, 3, 6) : new Date(y-1, 3, 6);
+  const taxStartISO = taxStart.toISOString().split('T')[0];
+  const todayISO = now.toISOString().split('T')[0];
+  const expenses = getExpenses().filter(e => e.date && e.date >= taxStartISO && e.date <= todayISO);
+  const total = expenses.reduce((s, e) => s + e.amount, 0);
+  document.getElementById('tax-exp').value = total.toFixed(2);
+  calcTax();
+}
+
+function calcTax() {
+  const grossIncome = parseFloat(document.getElementById('tax-income').value) || 0;
+  const expenses    = parseFloat(document.getElementById('tax-exp').value) || 0;
+  const paOverride  = parseFloat(document.getElementById('tax-allowance').value);
+  const pa          = isNaN(paOverride) ? TX.personalAllowance : paOverride;
+
+  const profit = Math.max(0, grossIncome - expenses);
+
+  // Personal allowance tapering above £100k
+  let effectivePA = pa;
+  if (profit > TX.paTaperStart) {
+    effectivePA = Math.max(0, pa - Math.floor((profit - TX.paTaperStart) / 2));
+  }
+
+  // ── Income Tax ──────────────────────────────────
+  const taxableIncome = Math.max(0, profit - effectivePA);
+  const basicBand     = TX.basicRateLimit - effectivePA; // width of basic band
+  const itRows = [];
+  let incomeTax = 0;
+
+  if (taxableIncome <= 0) {
+    itRows.push({ label: `Personal allowance (£${effectivePA.toLocaleString('en-GB')})`, rate: '0%', amount: 0, note: 'No tax on this portion' });
+  } else {
+    itRows.push({ label: `Personal allowance (£${Math.min(profit, effectivePA).toLocaleString('en-GB')})`, rate: '0%', amount: 0, note: '' });
+    const basicTaxable = Math.min(taxableIncome, basicBand);
+    if (basicTaxable > 0) {
+      const tax = basicTaxable * TX.basicRate;
+      incomeTax += tax;
+      itRows.push({ label: `Basic rate band (£${basicTaxable.toLocaleString('en-GB',{maximumFractionDigits:0})})`, rate: '20%', amount: tax, note: 'Up to £50,270' });
+    }
+    const higherTaxable = Math.min(Math.max(0, taxableIncome - basicBand), TX.higherRateLimit - TX.basicRateLimit);
+    if (higherTaxable > 0) {
+      const tax = higherTaxable * TX.higherRate;
+      incomeTax += tax;
+      itRows.push({ label: `Higher rate band (£${higherTaxable.toLocaleString('en-GB',{maximumFractionDigits:0})})`, rate: '40%', amount: tax, note: '£50,271 – £125,140' });
+    }
+    const addlTaxable = Math.max(0, taxableIncome - (TX.higherRateLimit - effectivePA));
+    if (addlTaxable > 0) {
+      const tax = addlTaxable * TX.additionalRate;
+      incomeTax += tax;
+      itRows.push({ label: `Additional rate (£${addlTaxable.toLocaleString('en-GB',{maximumFractionDigits:0})})`, rate: '45%', amount: tax, note: 'Above £125,140' });
+    }
+  }
+
+  // ── National Insurance ──────────────────────────
+  const niRows = [];
+  let niTotal = 0;
+
+  // Class 2
+  if (profit >= TX.class2SPT) {
+    const class2 = TX.class2WeeklyRate * 52;
+    niTotal += class2;
+    niRows.push({ label: 'Class 2 NI (£3.45/week × 52)', rate: 'Flat', amount: class2, note: `Profits above £${TX.class2SPT.toLocaleString('en-GB')}` });
+  } else {
+    niRows.push({ label: 'Class 2 NI', rate: '—', amount: 0, note: `Profits below £${TX.class2SPT.toLocaleString('en-GB')} — voluntary only` });
+  }
+
+  // Class 4
+  const c4Lower = Math.min(Math.max(0, profit - TX.class4LowerLimit), TX.class4UpperLimit - TX.class4LowerLimit);
+  const c4Upper = Math.max(0, profit - TX.class4UpperLimit);
+  if (c4Lower > 0) {
+    const tax = c4Lower * TX.class4LowerRate;
+    niTotal += tax;
+    niRows.push({ label: `Class 4 NI — lower band (£${c4Lower.toLocaleString('en-GB',{maximumFractionDigits:0})})`, rate: '6%', amount: tax, note: `£${TX.class4LowerLimit.toLocaleString('en-GB')} – £${TX.class4UpperLimit.toLocaleString('en-GB')}` });
+  }
+  if (c4Upper > 0) {
+    const tax = c4Upper * TX.class4UpperRate;
+    niTotal += tax;
+    niRows.push({ label: `Class 4 NI — upper band (£${c4Upper.toLocaleString('en-GB',{maximumFractionDigits:0})})`, rate: '2%', amount: tax, note: `Above £${TX.class4UpperLimit.toLocaleString('en-GB')}` });
+  }
+  if (c4Lower === 0 && c4Upper === 0) {
+    niRows.push({ label: 'Class 4 NI', rate: '—', amount: 0, note: `Profits below £${TX.class4LowerLimit.toLocaleString('en-GB')}` });
+  }
+
+  const totalTax = incomeTax + niTotal;
+  const effectiveRate = profit > 0 ? (totalTax / profit) * 100 : 0;
+  const takeHome = Math.max(0, profit - totalTax);
+
+  // Reserve rate — based on gross income so you set aside from every invoice
+  _taxReservePct = grossIncome > 0 ? Math.min(99, (totalTax / grossIncome) * 100) : 0;
+
+  // ── Render ──────────────────────────────────────
+  document.getElementById('tx-profit').textContent = fmt(profit);
+  document.getElementById('tx-total').textContent  = fmt(totalTax);
+  document.getElementById('tx-rate').textContent   = effectiveRate.toFixed(1) + '%';
+  document.getElementById('tx-takehome').textContent = fmt(takeHome);
+
+  function rowHTML(r) {
+    return `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border);gap:8px">
+      <div style="flex:1"><div style="font-size:13px;font-weight:500">${r.label} <span style="background:var(--bg3);border-radius:4px;padding:1px 6px;font-size:11px;color:var(--text2);margin-left:4px">${r.rate}</span></div>${r.note?`<div style="font-size:11px;color:var(--text3);margin-top:2px">${r.note}</div>`:''}</div>
+      <div style="font-weight:600;font-size:14px;flex-shrink:0;color:${r.amount>0?'var(--accent)':'var(--text3)'}">${r.amount>0?fmt(r.amount):'—'}</div>
+    </div>`;
+  }
+
+  document.getElementById('tx-it-rows').innerHTML  = itRows.map(rowHTML).join('');
+  document.getElementById('tx-it-total').textContent = fmt(incomeTax);
+  document.getElementById('tx-ni-rows').innerHTML  = niRows.map(rowHTML).join('');
+  document.getElementById('tx-ni-total').textContent = fmt(niTotal);
+  document.getElementById('tx-reserve-pct').textContent = _taxReservePct.toFixed(1) + '%';
+
+  // HMRC dates
+  const now2 = new Date();
+  const taxY = now2 >= new Date(now2.getFullYear(), 3, 6) ? now2.getFullYear() : now2.getFullYear() - 1;
+  document.getElementById('tx-dates').innerHTML = [
+    { date: `31 Jan ${taxY+1}`, label: 'Self-assessment return & balancing payment due', highlight: true },
+    { date: `31 Jan ${taxY+1}`, label: '1st payment on account (50% of this year's bill)', highlight: false },
+    { date: `31 Jul ${taxY+1}`, label: '2nd payment on account (50% of this year's bill)', highlight: false },
+    { date: `5 Oct ${taxY+1}`,  label: 'Register for self-assessment (if new)', highlight: false },
+  ].map(d=>`<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">
+    <div style="min-width:90px;font-weight:600;color:${d.highlight?'var(--orange)':'var(--text2)'}">${d.date}</div>
+    <div>${d.label}</div>
+  </div>`).join('');
+
+  document.getElementById('tax-results').style.display = 'block';
+  calcSetAside();
+}
+
+function calcSetAside() {
+  const invAmt = parseFloat(document.getElementById('tx-invoice-amt').value) || 0;
+  const res = document.getElementById('tx-set-aside-result');
+  if (!invAmt || _taxReservePct === 0) { res.style.display='none'; return; }
+  const setAside = invAmt * (_taxReservePct / 100);
+  const keep = invAmt - setAside;
+  document.getElementById('tx-sa-invoice').textContent = fmt(invAmt);
+  document.getElementById('tx-sa-tax').textContent     = fmt(setAside);
+  document.getElementById('tx-sa-keep').textContent    = fmt(keep);
+  res.style.display = 'block';
 }
 
 // ── Close modals on overlay tap ───────────────────────────────────────
