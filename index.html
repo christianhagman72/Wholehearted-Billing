@@ -726,6 +726,7 @@ function switchToTab(name){
   document.getElementById('fab-btn').style.display=(name==='log')?'flex':'none';
   document.getElementById('fab-exp').style.display=(name==='expenses')?'flex':'none';
   if(name==='tax') autoLoadTax();
+  if(name==='invoice') populateInvClientPicker();
 }
 
 // ── Filter ────────────────────────────────────────────────────────────
