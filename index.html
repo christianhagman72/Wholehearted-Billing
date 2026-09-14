@@ -1267,7 +1267,7 @@ function generatePDF(){
   const entries=getInvoiceEntries(), meta=getInvoiceMeta();
   if(!entries.length){ alert('No entries to invoice.'); return; }
   const total=entries.reduce((s,e)=>s+e.amount,0);
-  const fmtShort=iso=>new Date(iso+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'});
+  const fmtShort=iso=>new Date(iso+'T12:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'2-digit'});
   const rows=entries.map((e,i)=>{ const d=entryDetail(e); return `<tr style="background:${i%2===0?'#fff':'#f8fffe'}"><td>${fmtShort(e.date)}</td><td><strong>${e.serviceName||e.description||'Entry'}</strong>${e.notes?'<br><small style="color:#777">'+e.notes+'</small>':''}</td><td style="color:#7c3aed">${e.studentName||''}</td><td>${d}</td><td style="text-align:right;font-weight:600">${fmt(e.amount)}</td></tr>`; }).join('');
   const paymentFooter = (meta.provider.bank||meta.provider.bankAccount) ? `
     <div class="footer-payment">
@@ -1290,11 +1290,7 @@ function generatePDF(){
   .bill-to h3{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#1a6b6b;margin-bottom:5px;font-weight:700}
   .bill-to p{font-size:12px;color:#1a1a1a;margin-top:2px}
   table{width:100%;border-collapse:collapse;table-layout:fixed}
-  col.c-date{width:10%}
-  col.c-desc{width:50%}
-  col.c-student{width:13%}
-  col.c-detail{width:16%}
-  col.c-amount{width:12%}
+
   thead tr{background:#1a6b6b;color:white}
   th{padding:7px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.4px;font-weight:600;overflow:hidden}
   th:last-child{text-align:right}
@@ -1338,8 +1334,8 @@ function generatePDF(){
     ${meta.client.address?meta.client.address.split('\n').map(l=>`<p>${l}</p>`).join(''):''}
     ${meta.client.email?`<p>${meta.client.email}</p>`:''}
   </div>
-  <table>
-    <colgroup><col class="c-date"/><col class="c-desc"/><col class="c-student"/><col class="c-detail"/><col class="c-amount"/></colgroup>
+  <table style="width:100%;border-collapse:collapse;table-layout:fixed">
+    <colgroup><col style="width:9%"/><col style="width:51%"/><col style="width:13%"/><col style="width:15%"/><col style="width:12%"/></colgroup>
     <thead><tr><th>Date</th><th>Description</th><th>Student</th><th>Detail</th><th style="text-align:right">Amount</th></tr></thead>
     <tbody>${rows}</tbody>
     <tfoot><tr class="total-row"><td colspan="4" style="text-align:right">Total</td><td>${fmt(total)}</td></tr></tfoot>
