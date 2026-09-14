@@ -29,7 +29,7 @@
   onSnapshot(collection(db,'entries'),  s=>{ window._entries=[]; s.forEach(d=>window._entries.push(d.data())); window.renderAll&&window.renderAll(); });
   onSnapshot(collection(db,'services'), s=>{ window._services=[]; s.forEach(d=>window._services.push(d.data())); window.renderAll&&window.renderAll(); });
   onSnapshot(collection(db,'students'), s=>{ window._students=[]; s.forEach(d=>window._students.push(d.data())); window.renderAll&&window.renderAll(); });
-  onSnapshot(collection(db,'clients'),  s=>{ window._clients=[];  s.forEach(d=>window._clients.push(d.data()));  window.renderAll&&window.renderAll(); });
+  onSnapshot(collection(db,'clients'),  s=>{ window._clients=[];  s.forEach(d=>window._clients.push(d.data()));  window.renderAll&&window.renderAll(); setTimeout(()=>{ if(window.populateInvClientPicker) populateInvClientPicker(); },100); });
   onSnapshot(collection(db,'expenses'), s=>{ window._expenses=[]; s.forEach(d=>window._expenses.push(d.data())); window.renderAll&&window.renderAll(); });
   onSnapshot(doc(db,'settings','provider'), s=>{ if(s.exists()){ window._provider=s.data(); window.applyProvider&&window.applyProvider(); }});
   window._db = {
@@ -868,14 +868,34 @@ function populateSelects(){
 
 // ── Invoice client picker ────────────────────────────────────────────
 function populateInvClientPicker(){
-  const sel=document.getElementById('inv-client-picker'), cur=sel.value;
-  sel.innerHTML='<option value="">— Pick a saved client or fill in below —</option>'+getClients().map(c=>`<option value="${c.id}">${c.company||c.name}${c.name&&c.company?' ('+c.name+')':''}</option>`).join('');
-  if([...sel.options].some(o=>o.value===cur)) sel.value=cur;
+  const sel=document.getElementById('inv-client-picker');
+  if(!sel) return;
+  const clients=getClients();
+  const cur=sel.value;
+  // Find default client
+  const defClient=clients.find(c=>c.isDefault);
+  sel.innerHTML='<option value="">— Pick a saved client —</option>'+
+    clients.map(c=>`<option value="${c.id}">${c.company||c.name}${c.name&&c.company?' ('+c.name+')':''}${c.isDefault?' ★':''}</option>`).join('');
+  // Restore previous selection, else apply default
+  if(cur && [...sel.options].some(o=>o.value===cur)){
+    sel.value=cur;
+  } else if(defClient && !cur){
+    sel.value=defClient.id;
+    // Auto-fill fields with default client
+    document.getElementById('inv-client-company').value=defClient.company||'';
+    document.getElementById('inv-client-name').value=defClient.name||'';
+    document.getElementById('inv-client-address').value=defClient.address||'';
+    document.getElementById('inv-client-email').value=defClient.email||'';
+  }
 }
 
 function onInvClientPick(){
   const id=document.getElementById('inv-client-picker').value;
-  if(!id) return;
+  if(!id){
+    // Clear fields if blank selected
+    ['inv-client-company','inv-client-name','inv-client-address','inv-client-email'].forEach(f=>document.getElementById(f).value='');
+    return;
+  }
   const c=getClients().find(x=>x.id===id);
   if(!c) return;
   document.getElementById('inv-client-company').value=c.company||'';
