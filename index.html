@@ -29,7 +29,7 @@
   onSnapshot(collection(db,'entries'),  s=>{ window._entries=[]; s.forEach(d=>window._entries.push(d.data())); window.renderAll&&window.renderAll(); });
   onSnapshot(collection(db,'services'), s=>{ window._services=[]; s.forEach(d=>window._services.push(d.data())); window.renderAll&&window.renderAll(); });
   onSnapshot(collection(db,'students'), s=>{ window._students=[]; s.forEach(d=>window._students.push(d.data())); window.renderAll&&window.renderAll(); });
-  onSnapshot(collection(db,'clients'),  s=>{ window._clients=[];  s.forEach(d=>window._clients.push(d.data()));  window.renderAll&&window.renderAll(); setTimeout(()=>{ if(window.populateInvClientPicker) populateInvClientPicker(); },100); });
+  onSnapshot(collection(db,'clients'),  s=>{ window._clients=[];  s.forEach(d=>window._clients.push(d.data()));  window.renderAll&&window.renderAll(); });
   onSnapshot(collection(db,'expenses'), s=>{ window._expenses=[]; s.forEach(d=>window._expenses.push(d.data())); window.renderAll&&window.renderAll(); });
   onSnapshot(doc(db,'settings','provider'), s=>{ if(s.exists()){ window._provider=s.data(); window.applyProvider&&window.applyProvider(); }});
   window._db = {
@@ -745,7 +745,7 @@ function filteredEntries(filter){
 function setFilter(f,el){ currentFilter=f; document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active')); el.classList.add('active'); renderAll(); }
 
 // ── Render all ────────────────────────────────────────────────────────
-window.renderAll=function(){ renderLog(); renderSummary(); renderServices(); renderStudents(); renderClients(); renderExpenses(); populateSelects(); populateInvFilter(); populateInvClientPicker(); populateRptClient(); };
+window.renderAll=function(){ renderLog(); renderSummary(); renderServices(); renderStudents(); renderClients(); renderExpenses(); populateSelects(); populateInvFilter(); populateRptClient(); };
 
 // ── Render Log (grouped by date, sorted desc) ─────────────────────────
 function renderLog(){
@@ -850,6 +850,8 @@ function renderClients(){
       <button class="del-btn"  onclick="deleteClient('${c.id}')">✕</button>
     </div>
   </div>`).join(''):'<div class="empty-state" style="padding:24px"><p>No clients yet</p></div>';
+  // Refresh invoice client picker every time clients load
+  populateInvClientPicker();
 }
 
 // ── Populate dropdowns ────────────────────────────────────────────────
@@ -1265,7 +1267,8 @@ function generatePDF(){
   const entries=getInvoiceEntries(), meta=getInvoiceMeta();
   if(!entries.length){ alert('No entries to invoice.'); return; }
   const total=entries.reduce((s,e)=>s+e.amount,0);
-  const rows=entries.map((e,i)=>{ const d=entryDetail(e); return `<tr style="background:${i%2===0?'#fff':'#f8fffe'}"><td>${fmtDate(e.date)}</td><td><strong>${e.serviceName||e.description||'Entry'}</strong>${e.notes?'<br><small style="color:#777">'+e.notes+'</small>':''}</td><td style="color:#7c3aed">${e.studentName||''}</td><td>${d}</td><td style="text-align:right;font-weight:600">${fmt(e.amount)}</td></tr>`; }).join('');
+  const fmtShort=iso=>new Date(iso+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'});
+  const rows=entries.map((e,i)=>{ const d=entryDetail(e); return `<tr style="background:${i%2===0?'#fff':'#f8fffe'}"><td>${fmtShort(e.date)}</td><td><strong>${e.serviceName||e.description||'Entry'}</strong>${e.notes?'<br><small style="color:#777">'+e.notes+'</small>':''}</td><td style="color:#7c3aed">${e.studentName||''}</td><td>${d}</td><td style="text-align:right;font-weight:600">${fmt(e.amount)}</td></tr>`; }).join('');
   const paymentFooter = (meta.provider.bank||meta.provider.bankAccount) ? `
     <div class="footer-payment">
       <div class="fp-title">Payment Details &nbsp;·&nbsp; ${meta.number}</div>
@@ -1287,17 +1290,17 @@ function generatePDF(){
   .bill-to h3{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#1a6b6b;margin-bottom:5px;font-weight:700}
   .bill-to p{font-size:12px;color:#1a1a1a;margin-top:2px}
   table{width:100%;border-collapse:collapse;table-layout:fixed}
-  col.c-date{width:13%}
-  col.c-desc{width:42%}
-  col.c-student{width:15%}
-  col.c-detail{width:18%}
+  col.c-date{width:10%}
+  col.c-desc{width:50%}
+  col.c-student{width:13%}
+  col.c-detail{width:16%}
   col.c-amount{width:12%}
   thead tr{background:#1a6b6b;color:white}
   th{padding:7px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.4px;font-weight:600;overflow:hidden}
   th:last-child{text-align:right}
   td{padding:8px 8px;border-bottom:1px solid #eee;font-size:11px;vertical-align:top;overflow-wrap:break-word;word-wrap:break-word}
   td:last-child{text-align:right;white-space:nowrap}
-  td:first-child{white-space:nowrap;font-size:10px;color:#555}
+  td:first-child{font-size:9px;color:#555;word-break:break-all}
   .total-row{background:#e8f4f4}
   .total-row td{font-size:13px;font-weight:700;color:#1a6b6b;padding:10px 8px;border:none}
   .footer-payment{position:fixed;bottom:0;left:0;right:0;background:#1a6b6b;color:white;padding:7px 16mm;font-size:10px}
