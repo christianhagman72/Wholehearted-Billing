@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="WH Actions">
+<meta name="theme-color" content="#ffffff">
+<title>Wholehearted Actions</title>
+<style>
+  :root {
+    --ink: #1a1a1a;
+    --ink2: #555;
+    --ink3: #999;
+    --line: #e8e8e8;
+    --line2: #d0d0d0;
+    --surface: #ffffff;
+    --surface1: #f7f7f6;
+    --surface2: #f0f0ee;
+    --accent: #2563eb;
+    --accent-bg: #eff6ff;
+    --accent-text: #1d4ed8;
+    --danger: #dc2626;
+    --danger-bg: #fef2f2;
+    --danger-text: #b91c1c;
+    --success: #16a34a;
+    --success-bg: #f0fdf4;
+    --success-text: #15803d;
+    --warn-bg: #fffbeb;
+    --warn-text: #b45309;
+    --pro-bg: #f5f3ff;
+    --pro-text: #6d28d9;
+    --radius: 12px;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; background: var(--surface1); font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif; color: var(--ink); }
+
+  /* Layout */
+  #app { display: flex; flex-direction: column; height: 100%; max-width: 430px; margin: 0 auto; background: var(--surface); }
+  #topbar { padding: calc(var(--safe-top) + 12px) 16px 12px; background: var(--surface); border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  #topbar h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; color: var(--ink); }
+  #topbar .badge { background: var(--accent-bg); color: var(--accent-text); font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 20px; }
+  #tabs { display: flex; background: var(--surface); border-bottom: 1px solid var(--line); flex-shrink: 0; overflow-x: auto; }
+  #tabs::-webkit-scrollbar { display: none; }
+  .tab { flex: 1; min-width: 60px; padding: 10px 4px; font-size: 12px; font-weight: 500; color: var(--ink3); background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; text-align: center; white-space: nowrap; }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  #content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .pane { display: none; padding: 16px; padding-bottom: calc(16px + var(--safe-bottom)); }
+  .pane.active { display: block; }
+
+  /* Filters */
+  .filter-row { display: flex; gap: 6px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 2px; }
+  .filter-row::-webkit-scrollbar { display: none; }
+  .fbtn { flex-shrink: 0; padding: 5px 12px; font-size: 12px; font-weight: 500; background: var(--surface1); border: 1px solid var(--line2); border-radius: 20px; color: var(--ink2); cursor: pointer; }
+  .fbtn.active { background: var(--accent-bg); color: var(--accent-text); border-color: transparent; }
+
+  /* Stats */
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .stat { background: var(--surface1); border-radius: var(--radius); padding: 12px 14px; }
+  .stat-n { font-size: 26px; font-weight: 700; letter-spacing: -1px; color: var(--ink); }
+  .stat-n.red { color: var(--danger); }
+  .stat-l { font-size: 11px; color: var(--ink3); margin-top: 2px; }
+
+  /* Action cards */
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 8px; }
+  .card.overdue { border-color: #fca5a5; background: #fff8f8; }
+  .card.done { opacity: 0.55; }
+  .card-row { display: flex; align-items: flex-start; gap: 10px; }
+  .check { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--line2); background: none; cursor: pointer; flex-shrink: 0; margin-top: 1px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: transparent; }
+  .check.done { background: var(--success); border-color: var(--success); color: #fff; }
+  .card-body { flex: 1; min-width: 0; }
+  .card-title { font-size: 14px; font-weight: 600; color: var(--ink); margin-bottom: 3px; word-break: break-word; }
+  .card.done .card-title { text-decoration: line-through; color: var(--ink3); }
+  .card-desc { font-size: 12px; color: var(--ink2); margin-bottom: 6px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chip { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 10px; }
+  .chip-due { background: var(--accent-bg); color: var(--accent-text); }
+  .chip-overdue { background: var(--danger-bg); color: var(--danger-text); }
+  .chip-done { background: var(--success-bg); color: var(--success-text); }
+  .chip-owner { background: var(--surface1); color: var(--ink2); border: 1px solid var(--line); }
+  .chip-client { background: var(--pro-bg); color: var(--pro-text); }
+  .chip-hi { background: var(--danger-bg); color: var(--danger-text); }
+  .chip-med { background: var(--warn-bg); color: var(--warn-text); }
+  .chip-lo { background: var(--success-bg); color: var(--success-text); }
+  .card-meta { font-size: 11px; color: var(--ink3); margin-top: 6px; }
+  .del-btn { background: none; border: none; color: var(--ink3); cursor: pointer; font-size: 18px; padding: 0; flex-shrink: 0; }
+
+  /* Forms */
+  .form-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 12px; font-weight: 500; color: var(--ink2); margin-bottom: 5px; }
+  .field input, .field select, .field textarea {
+    width: 100%; font-size: 15px; font-family: inherit; color: var(--ink);
+    background: var(--surface1); border: 1px solid var(--line2); border-radius: 8px;
+    padding: 9px 11px; outline: none; appearance: none; -webkit-appearance: none;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); background: var(--surface); }
+  .field textarea { height: 70px; resize: none; }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .err-msg { font-size: 12px; color: var(--danger); margin-top: 3px; }
+  .btn-row { display: flex; gap: 8px; margin-top: 14px; }
+  .btn { flex: 1; padding: 12px; font-size: 15px; font-weight: 600; border-radius: 10px; border: none; cursor: pointer; font-family: inherit; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-secondary { background: var(--surface1); color: var(--ink2); border: 1px solid var(--line2); }
+
+  /* Client manager */
+  .section-title { font-size: 13px; font-weight: 600; color: var(--ink2); margin-bottom: 10px; margin-top: 20px; }
+  .tag-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .tag { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; padding: 4px 10px; border-radius: 20px; background: var(--pro-bg); color: var(--pro-text); }
+  .tag button { background: none; border: none; color: var(--pro-text); cursor: pointer; font-size: 15px; padding: 0; line-height: 1; }
+  .add-row { display: flex; gap: 8px; }
+  .add-row input { flex: 1; font-size: 14px; font-family: inherit; background: var(--surface1); border: 1px solid var(--line2); border-radius: 8px; padding: 9px 11px; outline: none; color: var(--ink); }
+  .add-row input:focus { border-color: var(--accent); background: var(--surface); }
+  .add-row button { padding: 9px 16px; font-size: 14px; font-weight: 600; background: var(--accent); color: #fff; border: none; border-radius: 8px; cursor: pointer; }
+
+  /* Scan */
+  .drop-zone { border: 2px dashed var(--line2); border-radius: var(--radius); padding: 32px 16px; text-align: center; cursor: pointer; background: var(--surface1); margin-bottom: 12px; }
+  .drop-zone:active { background: var(--accent-bg); border-color: var(--accent); }
+  .drop-zone .icon { font-size: 40px; margin-bottom: 8px; }
+  .drop-zone p { font-size: 15px; font-weight: 600; color: var(--ink); margin-bottom: 4px; }
+  .drop-zone small { font-size: 12px; color: var(--ink3); }
+  .scan-preview { border-radius: 10px; overflow: hidden; margin-bottom: 12px; border: 1px solid var(--line); }
+  .scan-preview img { width: 100%; max-height: 220px; object-fit: cover; display: block; }
+  .status-box { background: var(--accent-bg); border-radius: var(--radius); padding: 14px; margin-bottom: 12px; font-size: 14px; color: var(--accent-text); font-weight: 500; }
+  .review-item { background: var(--surface); border: 1.5px solid var(--accent); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 10px; }
+  .review-item h4 { font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 8px; }
+  .mini-field { display: grid; grid-template-columns: 68px 1fr; gap: 6px; align-items: center; margin-bottom: 6px; }
+  .mini-field label { font-size: 12px; color: var(--ink2); }
+  .mini-field input, .mini-field select { font-size: 13px; font-family: inherit; background: var(--surface1); border: 1px solid var(--line2); border-radius: 6px; padding: 5px 8px; width: 100%; outline: none; color: var(--ink); }
+  .mini-btns { display: flex; gap: 6px; margin-top: 8px; }
+  .mini-btn { padding: 7px 14px; font-size: 13px; font-weight: 600; border-radius: 8px; border: none; cursor: pointer; font-family: inherit; }
+  .mini-add { background: var(--success); color: #fff; }
+  .mini-skip { background: var(--surface1); color: var(--ink2); border: 1px solid var(--line2); }
+  .success-banner { background: var(--success-bg); color: var(--success-text); border-radius: var(--radius); padding: 14px; text-align: center; font-size: 14px; font-weight: 600; margin-bottom: 10px; }
+
+  /* Share */
+  .share-pre { font-size: 12px; white-space: pre-wrap; color: var(--ink2); background: var(--surface1); border-radius: 10px; padding: 12px; border: 1px solid var(--line); max-height: 260px; overflow-y: auto; font-family: 'SF Mono', Menlo, monospace; line-height: 1.6; margin-bottom: 10px; }
+  .full-btn { width: 100%; padding: 13px; font-size: 15px; font-weight: 600; border-radius: 10px; border: none; cursor: pointer; font-family: inherit; background: var(--surface1); color: var(--ink); border: 1px solid var(--line2); }
+
+  /* Empty + loading */
+  .empty { text-align: center; padding: 48px 16px; color: var(--ink3); font-size: 14px; }
+  .empty .icon { font-size: 36px; display: block; margin-bottom: 10px; }
+  .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid var(--line2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Toast */
+  #toast { position: fixed; bottom: calc(20px + var(--safe-bottom)); left: 50%; transform: translateX(-50%) translateY(80px); background: var(--ink); color: #fff; font-size: 13px; font-weight: 500; padding: 10px 18px; border-radius: 20px; opacity: 0; transition: all 0.25s; z-index: 999; white-space: nowrap; }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* Sync indicator */
+  .sync { font-size: 11px; color: var(--ink3); display: flex; align-items: center; gap: 4px; }
+  .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); display: inline-block; }
+  .sync-dot.err { background: var(--danger); }
+  .sync-dot.loading { background: var(--warn-text); animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <div>
+      <h1>Actions</h1>
+      <div class="sync" id="sync-status"><span class="sync-dot loading" id="sync-dot"></span><span id="sync-label">Connecting…</span></div>
+    </div>
+    <span class="badge" id="open-badge">0 open</span>
+  </div>
+
+  <div id="tabs">
+    <button class="tab active" onclick="switchTab('list')">List</button>
+    <button class="tab" onclick="switchTab('scan')">📷 Scan</button>
+    <button class="tab" onclick="switchTab('add')">+ Add</button>
+    <button class="tab" onclick="switchTab('share')">Share</button>
+    <button class="tab" onclick="switchTab('settings')">Settings</button>
+  </div>
+
+  <div id="content">
+
+    <!-- LIST -->
+    <div class="pane active" id="pane-list">
+      <div class="stats">
+        <div class="stat"><div class="stat-n" id="s-open">0</div><div class="stat-l">Open</div></div>
+        <div class="stat"><div class="stat-n red" id="s-overdue">0</div><div class="stat-l">Overdue</div></div>
+      </div>
+      <div class="filter-row" id="status-filters">
+        <button class="fbtn active" onclick="setStatusFilter('all',this)">All</button>
+        <button class="fbtn" onclick="setStatusFilter('open',this)">Open</button>
+        <button class="fbtn" onclick="setStatusFilter('overdue',this)">Overdue</button>
+        <button class="fbtn" onclick="setStatusFilter('done',this)">Done</button>
+      </div>
+      <div class="filter-row" id="client-filters"></div>
+      <div id="action-list"></div>
+    </div>
+
+    <!-- SCAN -->
+    <div class="pane" id="pane-scan">
+      <div id="scan-upload">
+        <div class="drop-zone" onclick="document.getElementById('img-file').click()">
+          <div class="icon">📷</div>
+          <p>Photograph your notes</p>
+          <small>Handwritten, whiteboard, sticky notes — Claude reads them all</small>
+        </div>
+        <input type="file" id="img-file" accept="image/*" capture="environment" style="display:none" onchange="onImagePicked(event)">
+      </div>
+      <div id="scan-preview" style="display:none">
+        <div class="scan-preview"><img id="preview-img" src="" alt="Notes preview"></div>
+        <div class="btn-row">
+          <button class="btn btn-secondary" onclick="resetScan()">Use different image</button>
+          <button class="btn btn-primary" onclick="doScan()">Extract actions</button>
+        </div>
+      </div>
+      <div id="scan-working" style="display:none" class="status-box"><span class="spinner"></span> Reading your notes…</div>
+      <div id="scan-results"></div>
+    </div>
+
+    <!-- ADD -->
+    <div class="pane" id="pane-add">
+      <div class="form-card">
+        <div class="field">
+          <label>Action title *</label>
+          <input type="text" id="f-title" placeholder="e.g. Send proposal to client">
+          <div class="err-msg" id="e-title"></div>
+        </div>
+        <div class="field">
+          <label>Description</label>
+          <textarea id="f-desc" placeholder="Optional context or notes…"></textarea>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Owner</label>
+            <input type="text" id="f-owner" placeholder="Name or @handle">
+          </div>
+          <div class="field">
+            <label>Priority</label>
+            <select id="f-pri">
+              <option value="med">Medium</option>
+              <option value="high">High</option>
+              <option value="low">Low</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label>Client / topic</label>
+          <select id="f-client"><option value="">— none —</option></select>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Date raised</label>
+            <input type="date" id="f-raised">
+          </div>
+          <div class="field">
+            <label>Due date *</label>
+            <input type="date" id="f-due">
+            <div class="err-msg" id="e-due"></div>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-secondary" onclick="switchTab('list')">Cancel</button>
+          <button class="btn btn-primary" onclick="submitAction()">Add action</button>
+        </div>
+      </div>
+
+      <div class="section-title">Manage clients / topics</div>
+      <div class="tag-list" id="client-tags"></div>
+      <div class="add-row">
+        <input type="text" id="new-client" placeholder="New client or topic name" onkeydown="if(event.key==='Enter')addClient()">
+        <button onclick="addClient()">Add</button>
+      </div>
+      <div class="err-msg" id="e-client" style="margin-top:6px"></div>
+    </div>
+
+    <!-- SHARE -->
+    <div class="pane" id="pane-share">
+      <div class="share-pre" id="share-text"></div>
+      <button class="full-btn" onclick="copyShare()" style="margin-bottom:10px">📋 Copy to clipboard</button>
+      <button class="full-btn" onclick="shareNative()">↗ Share…</button>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="pane" id="pane-settings">
+      <div class="form-card">
+        <div class="section-title" style="margin-top:0">Firebase configuration</div>
+        <p style="font-size:13px;color:var(--ink2);margin-bottom:14px;line-height:1.5">Pre-configured to use the Wholehearted Education Billing Firebase project. Edit only if you need to point to a different project.</p>
+        <div class="field">
+          <label>API Key</label>
+          <input type="text" id="cfg-apiKey" placeholder="AIza…">
+        </div>
+        <div class="field">
+          <label>Auth Domain</label>
+          <input type="text" id="cfg-authDomain" placeholder="your-project.firebaseapp.com">
+        </div>
+        <div class="field">
+          <label>Project ID</label>
+          <input type="text" id="cfg-projectId" placeholder="your-project-id">
+        </div>
+        <div class="field">
+          <label>App ID</label>
+          <input type="text" id="cfg-appId" placeholder="1:123…">
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="saveConfig()">Save and connect</button>
+        </div>
+        <div class="err-msg" id="e-cfg" style="margin-top:8px"></div>
+      </div>
+      <div class="form-card" style="margin-top:4px">
+        <div class="section-title" style="margin-top:0">Anthropic API key</div>
+        <p style="font-size:13px;color:var(--ink2);margin-bottom:14px;line-height:1.5">Used for scanning handwritten notes. Get yours at console.anthropic.com.</p>
+        <div class="field">
+          <label>API Key</label>
+          <input type="password" id="cfg-anthropic" placeholder="sk-ant-…">
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="saveAnthropicKey()">Save key</button>
+        </div>
+      </div>
+      <div style="padding:16px 0;font-size:12px;color:var(--ink3);text-align:center">
+        Keys are stored in your browser only and never sent anywhere except their own APIs.
+      </div>
+    </div>
+
+  </div>
+</div>
+<div id="toast"></div>
+
+<!-- Firebase SDK -->
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+const today = new Date().toISOString().split('T')[0];
+document.getElementById('f-raised').value = today;
+document.getElementById('f-due').value = today;
+
+let db = null;
+let unsubscribe = null;
+let actions = [];
+let clients = [];
+let statusFilter = 'all';
+let clientFilter = 'all';
+let imgB64 = '', imgType = '';
+
+// ─── Config ───────────────────────────────────────────────────────────────────
+function loadConfig() {
+  try { return JSON.parse(localStorage.getItem('fb_config') || 'null'); } catch { return null; }
+}
+function saveConfig() {
+  const cfg = {
+    apiKey: document.getElementById('cfg-apiKey').value.trim(),
+    authDomain: document.getElementById('cfg-authDomain').value.trim(),
+    projectId: document.getElementById('cfg-projectId').value.trim(),
+    appId: document.getElementById('cfg-appId').value.trim(),
+  };
+  const errEl = document.getElementById('e-cfg');
+  if (!cfg.apiKey || !cfg.projectId) { errEl.textContent = 'API Key and Project ID are required.'; return; }
+  errEl.textContent = '';
+  localStorage.setItem('fb_config', JSON.stringify(cfg));
+  initFirebase(cfg);
+  toast('Firebase config saved — connecting…');
+}
+window.saveConfig = saveConfig;
+
+function saveAnthropicKey() {
+  const key = document.getElementById('cfg-anthropic').value.trim();
+  if (!key) return;
+  localStorage.setItem('ant_key', key);
+  toast('Anthropic key saved');
+}
+window.saveAnthropicKey = saveAnthropicKey;
+
+// ─── Firebase init ────────────────────────────────────────────────────────────
+function setSyncStatus(state, label) {
+  const dot = document.getElementById('sync-dot');
+  dot.className = 'sync-dot' + (state === 'ok' ? '' : state === 'err' ? ' err' : ' loading');
+  document.getElementById('sync-label').textContent = label;
+}
+
+function initFirebase(cfg) {
+  if (unsubscribe) unsubscribe();
+  setSyncStatus('loading', 'Connecting…');
+  try {
+    const app = initializeApp(cfg, cfg.projectId + "_actions");
+    db = getFirestore(app);
+    listenActions();
+    listenClients();
+  } catch(e) {
+    setSyncStatus('err', 'Config error');
+    toast('Firebase error: ' + e.message);
+  }
+}
+
+function listenActions() {
+  const q = query(collection(db, 'actions'), orderBy('createdAt', 'desc'));
+  unsubscribe = onSnapshot(q, snap => {
+    actions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    setSyncStatus('ok', 'Live');
+    render();
+  }, err => {
+    setSyncStatus('err', 'Sync error');
+    toast('Firestore: ' + err.message);
+  });
+}
+
+function listenClients() {
+  onSnapshot(doc(db, 'config', 'clients'), snap => {
+    clients = snap.exists() ? (snap.data().list || []) : [];
+    renderClientDropdown();
+    renderClientTags();
+    renderClientFilters();
+  });
+}
+
+async function saveClients() {
+  if (!db) return;
+  const { setDoc } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+  await setDoc(doc(db, 'config', 'clients'), { list: clients });
+}
+
+// ─── Actions CRUD ─────────────────────────────────────────────────────────────
+async function createAction(data) {
+  if (!db) { toast('Not connected to Firebase — check Settings'); return; }
+  await addDoc(collection(db, 'actions'), {
+    ...data,
+    done: false,
+    raised: data.raised || today,
+    createdAt: serverTimestamp()
+  });
+}
+
+async function toggleDone(id, current) {
+  if (!db) return;
+  await updateDoc(doc(db, 'actions', id), { done: !current });
+}
+
+async function deleteAction(id) {
+  if (!db) return;
+  await deleteDoc(doc(db, 'actions', id));
+}
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+function isOverdue(a) { return !a.done && a.due && a.due < today; }
+function fmtDate(d) { if (!d) return ''; const [y,m,day] = d.split('-'); return `${day}/${m}/${y}`; }
+function priChip(p) { return p === 'high' ? 'chip-hi' : p === 'low' ? 'chip-lo' : 'chip-med'; }
+function priLabel(p) { return p === 'high' ? 'High' : p === 'low' ? 'Low' : 'Med'; }
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function render() {
+  let filtered = actions.filter(a => {
+    const s = statusFilter === 'all' || (statusFilter === 'open' && !a.done) ||
+              (statusFilter === 'overdue' && isOverdue(a)) || (statusFilter === 'done' && a.done);
+    const c = clientFilter === 'all' || a.client === clientFilter;
+    return s && c;
+  });
+  filtered.sort((a,b) => {
+    if (a.done !== b.done) return a.done ? 1 : -1;
+    if (isOverdue(a) !== isOverdue(b)) return isOverdue(a) ? -1 : 1;
+    const p = {high:0,med:1,low:2};
+    if ((p[a.pri]||1) !== (p[b.pri]||1)) return (p[a.pri]||1) - (p[b.pri]||1);
+    return (a.due||'').localeCompare(b.due||'');
+  });
+  const open = actions.filter(a => !a.done).length;
+  const overdue = actions.filter(isOverdue).length;
+  document.getElementById('open-badge').textContent = open + ' open';
+  document.getElementById('s-open').textContent = open;
+  document.getElementById('s-overdue').textContent = overdue;
+
+  const list = document.getElementById('action-list');
+  if (!filtered.length) {
+    list.innerHTML = '<div class="empty"><span class="icon">✅</span>No actions here</div>';
+    return;
+  }
+  list.innerHTML = filtered.map(a => {
+    const over = isOverdue(a);
+    return `<div class="card${over?' overdue':''}${a.done?' done':''}">
+      <div class="card-row">
+        <button class="check${a.done?' done':''}" onclick="toggle('${a.id}',${a.done})" aria-label="Toggle done">${a.done ? '✓' : ''}</button>
+        <div class="card-body">
+          <div class="card-title">${esc(a.title)}</div>
+          ${a.desc ? `<div class="card-desc">${esc(a.desc)}</div>` : ''}
+          <div class="chips">
+            ${a.due ? `<span class="chip ${a.done?'chip-done':over?'chip-overdue':'chip-due'}">${a.done?'Done':over?'Overdue':''} ${fmtDate(a.due)}</span>` : ''}
+            ${a.client ? `<span class="chip chip-client">🏢 ${esc(a.client)}</span>` : ''}
+            ${a.owner ? `<span class="chip chip-owner">👤 ${esc(a.owner)}</span>` : ''}
+            <span class="chip ${priChip(a.pri)}">${priLabel(a.pri)}</span>
+          </div>
+          ${a.raised ? `<div class="card-meta">Raised ${fmtDate(a.raised)}</div>` : ''}
+        </div>
+        <button class="del-btn" onclick="del('${a.id}')" aria-label="Delete">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+window.toggle = (id, done) => toggleDone(id, done);
+window.del = (id) => { if (confirm('Delete this action?')) deleteAction(id); };
+
+function renderClientFilters() {
+  const row = document.getElementById('client-filters');
+  if (!clients.length) { row.innerHTML = ''; return; }
+  row.innerHTML = `<button class="fbtn${clientFilter==='all'?' active':''}" onclick="setCF('all',this)">All clients</button>` +
+    clients.map(c => `<button class="fbtn${clientFilter===c?' active':''}" onclick="setCF(${JSON.stringify(c)},this)">${esc(c)}</button>`).join('');
+}
+
+function renderClientDropdown() {
+  const sel = document.getElementById('f-client');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— none —</option>' + clients.map(c => `<option value="${esc(c)}"${cur===c?' selected':''}>${esc(c)}</option>`).join('');
+}
+
+function renderClientTags() {
+  const el = document.getElementById('client-tags');
+  el.innerHTML = clients.length
+    ? clients.map(c => `<span class="tag">${esc(c)}<button onclick="removeClient(${JSON.stringify(c)})" aria-label="Remove">×</button></span>`).join('')
+    : '<span style="font-size:13px;color:var(--ink3)">No clients yet — add one below.</span>';
+}
+
+// ─── Filters ──────────────────────────────────────────────────────────────────
+function setStatusFilter(f, el) {
+  statusFilter = f;
+  document.querySelectorAll('#status-filters .fbtn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  render();
+}
+window.setStatusFilter = setStatusFilter;
+
+function setCF(c, el) {
+  clientFilter = c;
+  document.querySelectorAll('#client-filters .fbtn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  render();
+}
+window.setCF = setCF;
+
+// ─── Clients ──────────────────────────────────────────────────────────────────
+function addClient() {
+  const inp = document.getElementById('new-client');
+  const val = inp.value.trim();
+  const err = document.getElementById('e-client');
+  err.textContent = '';
+  if (!val) { err.textContent = 'Enter a name first.'; return; }
+  if (clients.includes(val)) { err.textContent = 'Already exists.'; return; }
+  clients.push(val);
+  inp.value = '';
+  saveClients();
+  renderClientDropdown();
+  renderClientTags();
+  renderClientFilters();
+}
+window.addClient = addClient;
+
+function removeClient(c) {
+  clients = clients.filter(x => x !== c);
+  if (clientFilter === c) clientFilter = 'all';
+  saveClients();
+  renderClientDropdown();
+  renderClientTags();
+  renderClientFilters();
+  render();
+}
+window.removeClient = removeClient;
+
+// ─── Add action form ──────────────────────────────────────────────────────────
+function submitAction() {
+  const title = document.getElementById('f-title').value.trim();
+  const due = document.getElementById('f-due').value;
+  document.getElementById('e-title').textContent = '';
+  document.getElementById('e-due').textContent = '';
+  let ok = true;
+  if (!title) { document.getElementById('e-title').textContent = 'Enter a title.'; ok = false; }
+  if (!due) { document.getElementById('e-due').textContent = 'Enter a due date.'; ok = false; }
+  if (!ok) return;
+  createAction({
+    title,
+    desc: document.getElementById('f-desc').value.trim(),
+    owner: document.getElementById('f-owner').value.trim(),
+    client: document.getElementById('f-client').value,
+    pri: document.getElementById('f-pri').value,
+    raised: document.getElementById('f-raised').value,
+    due,
+  });
+  document.getElementById('f-title').value = '';
+  document.getElementById('f-desc').value = '';
+  document.getElementById('f-owner').value = '';
+  document.getElementById('f-client').value = '';
+  document.getElementById('f-pri').value = 'med';
+  document.getElementById('f-raised').value = today;
+  document.getElementById('f-due').value = today;
+  switchTab('list');
+  toast('Action added');
+}
+window.submitAction = submitAction;
+
+// ─── Scan ──────────────────────────────────────────────────────────────────────
+function onImagePicked(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  imgType = file.type || 'image/jpeg';
+  const reader = new FileReader();
+  reader.onload = ev => {
+    imgB64 = ev.target.result.split(',')[1];
+    document.getElementById('preview-img').src = ev.target.result;
+    document.getElementById('scan-upload').style.display = 'none';
+    document.getElementById('scan-preview').style.display = 'block';
+    document.getElementById('scan-results').innerHTML = '';
+  };
+  reader.readAsDataURL(file);
+}
+window.onImagePicked = onImagePicked;
+
+function resetScan() {
+  imgB64 = ''; imgType = '';
+  document.getElementById('img-file').value = '';
+  document.getElementById('scan-upload').style.display = 'block';
+  document.getElementById('scan-preview').style.display = 'none';
+  document.getElementById('scan-working').style.display = 'none';
+  document.getElementById('scan-results').innerHTML = '';
+}
+window.resetScan = resetScan;
+
+async function doScan() {
+  const antKey = localStorage.getItem('ant_key');
+  if (!antKey) { toast('Add your Anthropic key in Settings first'); switchTab('settings'); return; }
+  if (!imgB64) return;
+  document.getElementById('scan-preview').style.display = 'none';
+  document.getElementById('scan-working').style.display = 'block';
+  document.getElementById('scan-results').innerHTML = '';
+
+  const clientHint = clients.length ? `Known clients/topics: ${clients.join(', ')}. Assign one if clearly indicated.` : '';
+  const prompt = `Extract every action item from this image. For each one return JSON with: title (required), desc (optional), owner (optional), client (optional), due (YYYY-MM-DD, today=${today} if not specified), priority ("high","med","low"). ${clientHint}\nRespond ONLY with a JSON array, no markdown. If none found return [].`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': antKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6', max_tokens: 1000,
+        messages: [{ role: 'user', content: [
+          { type: 'image', source: { type: 'base64', media_type: imgType, data: imgB64 } },
+          { type: 'text', text: prompt }
+        ]}]
+      })
+    });
+    const data = await res.json();
+    document.getElementById('scan-working').style.display = 'none';
+    if (!res.ok) { toast('API error: ' + (data.error?.message || res.status)); document.getElementById('scan-preview').style.display='block'; return; }
+    const raw = data.content.map(b => b.text||'').join('').trim().replace(/```json|```/g,'').trim();
+    let items;
+    try { items = JSON.parse(raw); } catch { toast("Couldn't parse response — try a clearer photo"); document.getElementById('scan-preview').style.display='block'; return; }
+    showReview(items);
+  } catch(err) {
+    document.getElementById('scan-working').style.display = 'none';
+    document.getElementById('scan-preview').style.display = 'block';
+    toast('Network error — check connection');
+  }
+}
+window.doScan = doScan;
+
+function showReview(items) {
+  const el = document.getElementById('scan-results');
+  if (!items || !items.length) {
+    el.innerHTML = '<div class="empty"><span class="icon">🔍</span>No actions found — try a clearer photo.</div><button class="full-btn" onclick="resetScan()">Try again</button>';
+    return;
+  }
+  let added = 0;
+  const total = items.length;
+  function re() {
+    el.innerHTML = `<div style="font-size:13px;color:var(--ink2);margin-bottom:10px;display:flex;justify-content:space-between"><span>Found ${total} action${total!==1?'s':''}</span><span>${added} reviewed</span></div>` +
+      items.map((item, i) => {
+        if (item._skip) return `<div style="opacity:.4;font-size:12px;color:var(--ink3);margin-bottom:6px;text-decoration:line-through">${esc(item.title)}</div>`;
+        if (item._added) return `<div class="success-banner" style="margin-bottom:8px">✓ ${esc(item.title)}</div>`;
+        return `<div class="review-item">
+          <h4>Review action ${i+1} of ${total}</h4>
+          <div class="mini-field"><label>Title</label><input id="ri-t-${i}" value="${esc(item.title)}"></div>
+          <div class="mini-field"><label>Owner</label><input id="ri-o-${i}" value="${esc(item.owner||'')}"></div>
+          <div class="mini-field"><label>Client</label>
+            <select id="ri-c-${i}">
+              <option value="">— none —</option>
+              ${clients.map(c=>`<option value="${esc(c)}"${item.client===c?' selected':''}>${esc(c)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="mini-field"><label>Due</label><input type="date" id="ri-d-${i}" value="${item.due||today}"></div>
+          <div class="mini-field"><label>Priority</label>
+            <select id="ri-p-${i}">
+              <option value="high"${item.priority==='high'?' selected':''}>High</option>
+              <option value="med"${(item.priority||'med')==='med'?' selected':''}>Medium</option>
+              <option value="low"${item.priority==='low'?' selected':''}>Low</option>
+            </select>
+          </div>
+          ${item.desc ? `<div style="font-size:12px;color:var(--ink2);background:var(--surface1);padding:6px 8px;border-radius:6px;margin-top:4px">${esc(item.desc)}</div>` : ''}
+          <div class="mini-btns">
+            <button class="mini-btn mini-add" onclick="confirmItem(${i})">Add to list</button>
+            <button class="mini-btn mini-skip" onclick="skipItem(${i})">Skip</button>
+          </div>
+        </div>`;
+      }).join('') +
+      (added >= total ? `<div class="success-banner">All reviewed ✓</div><button class="full-btn" onclick="resetScan();switchTab('list')" style="margin-top:8px">View list</button>` : '');
+  }
+  window.confirmItem = (i) => {
+    const t = document.getElementById(`ri-t-${i}`).value.trim();
+    if (!t) return;
+    createAction({ title: t, desc: items[i].desc||'', owner: document.getElementById(`ri-o-${i}`).value.trim(), client: document.getElementById(`ri-c-${i}`).value, due: document.getElementById(`ri-d-${i}`).value||today, pri: document.getElementById(`ri-p-${i}`).value });
+    items[i]._added = true; added++; re(); toast('Action added');
+  };
+  window.skipItem = (i) => { items[i]._skip = true; added++; re(); };
+  re();
+}
+
+// ─── Share ────────────────────────────────────────────────────────────────────
+function buildShare() {
+  const grouped = {};
+  actions.forEach(a => { const k = a.client||'General'; if (!grouped[k]) grouped[k]=[]; grouped[k].push(a); });
+  const open = actions.filter(a=>!a.done).length;
+  const over = actions.filter(isOverdue).length;
+  const done = actions.filter(a=>a.done).length;
+  let txt = `ACTION LOG — ${new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}\n${'─'.repeat(36)}\nOpen: ${open}  |  Overdue: ${over}  |  Done: ${done}\n`;
+  if (!actions.length) { txt += '\n(No actions logged yet)'; document.getElementById('share-text').textContent = txt; return; }
+  Object.keys(grouped).sort().forEach(k => {
+    txt += `\n[ ${k.toUpperCase()} ]\n`;
+    grouped[k].filter(a=>!a.done).forEach(a => { txt += `  ${isOverdue(a)?'!':a.pri==='high'?'↑':' '} ${a.title}${a.owner?' ['+a.owner+']':''} — due ${fmtDate(a.due)}${isOverdue(a)?' OVERDUE':''}\n`; if(a.desc) txt+=`    ${a.desc}\n`; });
+    grouped[k].filter(a=>a.done).forEach(a => { txt += `  ✓ ${a.title}${a.owner?' ['+a.owner+']':''}\n`; });
+  });
+  document.getElementById('share-text').textContent = txt;
+}
+
+function copyShare() {
+  const txt = document.getElementById('share-text').textContent;
+  navigator.clipboard.writeText(txt).then(() => toast('Copied to clipboard'));
+}
+window.copyShare = copyShare;
+
+function shareNative() {
+  const txt = document.getElementById('share-text').textContent;
+  if (navigator.share) navigator.share({ title: 'Action Log', text: txt });
+  else copyShare();
+}
+window.shareNative = shareNative;
+
+// ─── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(t) {
+  document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('pane-' + t).classList.add('active');
+  document.querySelectorAll('.tab')[['list','scan','add','share','settings'].indexOf(t)]?.classList.add('active');
+  if (t === 'add') { renderClientDropdown(); renderClientTags(); }
+  if (t === 'share') buildShare();
+}
+window.switchTab = switchTab;
+
+// ─── Toast ────────────────────────────────────────────────────────────────────
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ─── Boot ──────────────────────────────────────────────────────────────────────
+// Wholehearted Education Billing — shared Firebase project
+const HARDCODED_CFG = {
+  apiKey: "AIzaSyAYpDuLuATh9Re3EcxI6qjZCToA0-JBpIg",
+  authDomain: "wholehearted-education-billing.firebaseapp.com",
+  projectId: "wholehearted-education-billing",
+  storageBucket: "wholehearted-education-billing.firebasestorage.app",
+  messagingSenderId: "474872904353",
+  appId: "1:474872904353:web:62f93a57af2eff4d064ee0",
+  measurementId: "G-LDG29SKR6B"
+};
+// Populate settings fields for display
+Object.entries(HARDCODED_CFG).forEach(([k,v]) => { const el = document.getElementById('cfg-'+k); if(el) el.value = v; });
+// Use any locally overridden config, otherwise use hardcoded
+const savedCfg = loadConfig();
+initFirebase(savedCfg || HARDCODED_CFG);
+const antKey = localStorage.getItem('ant_key');
+if (antKey) document.getElementById('cfg-anthropic').value = antKey;
+
+</script>
+</body>
+</html>
